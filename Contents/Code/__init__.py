@@ -129,6 +129,57 @@ def MainMenu():
     return oc
 
 
+@route(PREFIX + '/filters')
+def Filters(title2):
+    letters = utils.GetSoapsLetters()
+
+    container = ObjectContainer(title2=u'Filters')
+
+    container.add(
+        PopupDirectoryObject(
+            key=Callback(
+                StartsWithFilters,
+                title2=title2,
+            ),
+            title=u'Starts with',
+        )
+    )
+
+    return container
+
+@route(PREFIX + '/filters/letter')
+def StartsWithFilters(title2):
+    letters = utils.GetSoapsLetters()
+
+    container = ObjectContainer(title2=u'Starts With')
+
+    for letter in letters:
+        container.add(
+            PopupDirectoryObject(
+                key=Callback(
+                    SetLetterFilter,
+                    title2=title2,
+                    letter=letter,
+                ),
+                title=letter,
+            )
+        )
+
+    return container
+
+
+@route(PREFIX + '/filters/letter/{letter}')
+def SetLetterFilter(letter, title2):
+    filters = Dict['filters']
+    filters['letter'] = letter
+
+    Log.Debug('setting filters: {}'.format(json.dumps(filters, indent=2)))
+    Dict['filters'] = filters
+    Log.Debug('filters set')
+
+    return Soaps(title2)
+
+
 @route(PREFIX + '/soaps', filters={})
 def Soaps(title2, filters={}):
     
@@ -153,8 +204,8 @@ def Soaps(title2, filters={}):
             "Отказано в доступе"
         )
 
-    dir = ObjectContainer(title2=title2.decode())
-    dir.add(
+    container = ObjectContainer(title2=title2.decode())
+    container.add(
         PopupDirectoryObject(
             key=Callback(Filters, title2=title2),
             title=u'Фильтровать'
@@ -168,25 +219,21 @@ def Soaps(title2, filters={}):
     except KeyError:
         new = False
 
+    if new:
+        soaps = [x for x in soaps if x['unwatched'] != None]
+
     try:
         letter = filters['letter']
     except KeyError:
         letter = None
 
-    Log.Debug("new: %s" % new)
-    Log.Debug("letter: %s" % letter)
+    if letter != None:
+        soaps = [x for x in soaps if x['title'][0] == letter]
 
-    # filters["new"] -> item["unwatched"] != None
     for items in soaps:
-        if new and items["unwatched"] == None:
-            continue
-
-        if letter != None and items["title"][0] != letter:
-            continue
-
         soap_title = items["title"]
         title = soap_title
-        if filters["new"]:
+        if new:
             title = items["title"] + " (" + str(items["unwatched"]) + ")"
 
         summary = items["description"]
@@ -197,7 +244,7 @@ def Soaps(title2, filters={}):
             items['tvdb_id'] + '-1.jpg'
         id = items["sid"]
         thumb = Function(utils.Thumb, url=poster)
-        dir.add(
+        container.add(
             TVShowObject(
                 key=Callback(
                     show_seasons, id=id, soap_title=soap_title,
@@ -210,46 +257,13 @@ def Soaps(title2, filters={}):
                 thumb=thumb
             )
         )
-    return dir
-
-
-@route(PREFIX + '/filters')
-def Filters(title2):
-    letters = utils.GetSoapsLetters()
-
-    dir = ObjectContainer(title2=u'filter by starting letter')
-
-    for letter in letters:
-        dir.add(
-            PopupDirectoryObject(
-                key=Callback(
-                    SetLetterFilter,
-                    title2=title2,
-                    letter=letter,
-                ),
-                title=letter,
-            )
-        )
-
-    return dir
-
-
-@route(PREFIX + '/filters/letter/{letter}')
-def SetLetterFilter(letter, title2):
-    filters = Dict['filters']
-    filters['letter'] = letter
-
-    Log.Debug('setting filters: {}'.format(json.dumps(filters, indent=2)))
-    Dict['filters'] = filters
-    Log.Debug('filters set')
-
-    return Soaps(title2)
+    return container
 
 
 @route(PREFIX + '/soaps/{id}')
 def show_seasons(id, soap_title):
 
-    dir = ObjectContainer(title2=soap_title)
+    container = ObjectContainer(title2=soap_title)
     url = API_URL + 'episodes/' + id
     data = utils.GET(url)
     season = {}
@@ -288,7 +302,7 @@ def show_seasons(id, soap_title):
         season_id = str(row)
         poster = "http://covers.s4me.ru/season/big/%s.jpg" % season[row]
         thumb = Function(utils.Thumb, url=poster)
-        dir.add(
+        container.add(
             SeasonObject(
                 key=Callback(
                     show_episodes, sid=id, season=season_id,
@@ -302,13 +316,13 @@ def show_seasons(id, soap_title):
                 thumb=thumb
             )
         )
-    return dir
+    return container
 
 
 @route(PREFIX + '/soaps/{sid}/{season}', allow_sync=True)
 def show_episodes(sid, season, soap_title):
 
-    dir = ObjectContainer(title2=u'%s - %s сезон ' % (soap_title, season))
+    container = ObjectContainer(title2=u'%s - %s сезон ' % (soap_title, season))
     url = API_URL + 'episodes/' + sid
     data = utils.GET(url)
     quality = Prefs["quality"]
@@ -374,7 +388,7 @@ def show_episodes(sid, season, soap_title):
                                 )
                             )
                         )
-                    dir.add(EpisodeObject(
+                    container.add(EpisodeObject(
                         key=Callback(play_episode, sid=sid,
                                      eid=eid, ehash=ehash, row=row),
                         rating_key='soap4me' + row["eid"],
@@ -384,7 +398,7 @@ def show_episodes(sid, season, soap_title):
                         summary=summary,
                         items=[MediaObject(parts=parts)]
                     ))
-    return dir
+    return container
 
 
 def play_episode(sid, eid, ehash, row, *args, **kwargs):

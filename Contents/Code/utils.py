@@ -1,4 +1,5 @@
 API_URL = 'http://soap4.me/api/'
+ICON = 'icon.png'
 
 def Thumb(url):
     if url == '':
@@ -18,10 +19,19 @@ def GetSoaps():
     if filters['my']:
         url = API_URL + 'soap/my/'
 
-    obj = GET(url)
-    obj = sorted(obj, key=lambda k: k['title'])
+    soaps = GET(url)
+    soaps = sorted(soaps, key=lambda k: k['title'])
 
-    return obj
+    return soaps
+
+
+def GetEpisodes(id):
+    filters = Dict['filters']
+
+    url = API_URL + 'episodes/' + id
+    episodes = GET(url)
+
+    return episodes
 
 
 def GetSoapsLetters():
@@ -44,4 +54,20 @@ def GET(url):
             'Cookie': 'PHPSESSID=' + Dict['sid']
         },
         cacheTime=0
+    )
+
+
+def MakeTitle(episode):
+    new = ''
+    if not episode['watched']:
+        new = '* '
+
+    season = 'S{}'.format(episode['season'])
+    episodeString = 'E{}'.format(episode['episode'])
+    quality = episode['quality'].encode('utf-8')
+    translate = episode['translate'].encode('utf-8')
+    title = episode['title_en'].encode('utf-8').replace('&#039;', "'")
+    return '{}{}{} | {} | {} | {}'.format(
+        new, season, episodeString,
+        quality, translate, title,
     )

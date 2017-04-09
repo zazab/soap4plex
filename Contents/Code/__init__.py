@@ -20,8 +20,6 @@ VERSION = 2.0
 PREFIX = "/video/soap4meNew"
 TITLE = 'soap4.me (new)'
 ART = 'art.png'
-ICON = 'icon.png'
-BASE_URL = 'http://soap4.me/'
 API_URL = 'http://soap4.me/api/'
 LOGIN_URL = 'http://soap4.me/login/'
 USER_AGENT = 'xbmc for soap'
@@ -33,7 +31,7 @@ SID = ''
 def Start():
     ObjectContainer.art = R(ART)
     ObjectContainer.title1 = TITLE
-    DirectoryObject.thumb = R(ICON)
+    DirectoryObject.thumb = R(utils.ICON)
 
     HTTP.CacheTime = CACHE_1HOUR
     HTTP.Headers['User-Agent'] = USER_AGENT
@@ -51,7 +49,10 @@ def Login():
 
     if not username or not password:
         Log.Debug("No user or password in settings")
-        return 2
+        return MessageContainer(
+            "Ошибка",
+            "Ведите пароль и логин"
+        )
     else:
 
         try:
@@ -79,19 +80,22 @@ def Login():
             Dict['sid'] = SID
             Dict['token'] = TOKEN
 
-            return 1
+            return None
         else:
             LOGGEDIN = False
             Dict['sessionid'] = ""
 
-            return 3
+            return MessageContainer(
+                "Ошибка",
+                "Отказано в доступе"
+            )
+            
 
-
-@handler(PREFIX, TITLE, thumb=ICON, art=ART)
+@handler(PREFIX, TITLE, thumb=utils.ICON, art=ART)
 def MainMenu():
 
-    oc = ObjectContainer()
-    oc.add(
+    container = ObjectContainer()
+    container.add(
         DirectoryObject(
             key=Callback(
                 Soaps, title2=u'Все сериалы', filters={
@@ -102,7 +106,7 @@ def MainMenu():
             title=u'Все сериалы'
         )
     )
-    oc.add(
+    container.add(
         DirectoryObject(
             key=Callback(
                 Soaps, title2=u'Я смотрю', filters={
@@ -113,7 +117,7 @@ def MainMenu():
             title=u'Я смотрю'
         )
     )
-    oc.add(
+    container.add(
         DirectoryObject(
             key=Callback(
                 Soaps, title2=u'Новые эпизоды', filters={
@@ -124,9 +128,9 @@ def MainMenu():
             title=u'Новые эпизоды'
         )
     )
-    oc.add(PrefsObject(title=u'Настройки', thumb=R('settings.png')))
+    container.add(PrefsObject(title=u'Настройки', thumb=R('settings.png')))
 
-    return oc
+    return container
 
 
 @route(PREFIX + '/filters')
@@ -182,7 +186,7 @@ def SetLetterFilter(letter, title2):
 
 @route(PREFIX + '/soaps', filters={})
 def Soaps(title2, filters={}):
-    
+
     if filters != {}:
         Log.Debug("setting filters: %s".format(json.dumps(filters, indent=2)))
         Dict['filters'] = filters
@@ -191,18 +195,9 @@ def Soaps(title2, filters={}):
 
     Log.Debug('filters: {}'.format(json.dumps(filters, indent=2)))
 
-    logged = Login()
-    if logged == 2:
-        return MessageContainer(
-            "Ошибка",
-            "Ведите пароль и логин"
-        )
-
-    if logged == 3:
-        return MessageContainer(
-            "Ошибка",
-            "Отказано в доступе"
-        )
+    error = Login()
+    if error != None:
+        return error
 
     container = ObjectContainer(title2=title2.decode())
     container.add(
@@ -244,6 +239,7 @@ def Soaps(title2, filters={}):
             items['tvdb_id'] + '-1.jpg'
         id = items["sid"]
         thumb = Function(utils.Thumb, url=poster)
+
         container.add(
             TVShowObject(
                 key=Callback(
@@ -264,41 +260,34 @@ def Soaps(title2, filters={}):
 def show_seasons(id, soap_title):
 
     container = ObjectContainer(title2=soap_title)
-    url = API_URL + 'episodes/' + id
-    data = utils.GET(url)
+    episodes = utils.GetEpisodes(id)
+
     season = {}
     useason = {}
-    s_length = {}
 
-    unwatched = Dict['filters']['new']
-    Log.Debug('unwatched: {}'.format(unwatched))
+    new = Dict['filters']['new']
 
-    if unwatched:
-        for episode in data:
-            if episode['watched'] == None:
-                if int(episode['season']) not in season:
-                    season[int(episode['season'])] = episode['season_id']
-                if int(episode['season']) not in useason.keys():
-                    useason[int(episode['season'])] = []
-                    useason[int(episode['season'])].append(
-                        int(episode['episode']))
-                elif int(episode['episode']) not in useason[int(episode['season'])]:
-                    useason[int(episode['season'])].append(
-                        int(episode['episode']))
-    else:
-        for episode in data:
-            if int(episode['season']) not in season:
-                season[int(episode['season'])] = episode['season_id']
-                s_length[int(episode['season'])] = [episode['episode'], ]
-            else:
-                if episode['episode'] not in s_length[int(episode['season'])]:
-                    s_length[int(episode['season'])].append(episode['episode'])
+    if new:
+        episodes = [x for x in episodes if x['watched'] == None]
+
+    for episode in episodes:
+        seasonNum = int(episode['season'])
+        episodeNum = int(episode['episode'])
+
+        if seasonNum not in season:
+            season[seasonNum] = episode['season_id']
+
+        if seasonNum not in useason.keys():
+            useason[seasonNum] = []
+
+        if episodeNum not in useason[seasonNum]:
+            useason[seasonNum].append(episodeNum)
 
     for row in season:
-        if unwatched:
+        title = "%s сезон" % (row)
+        if new:
             title = "%s сезон (%s)" % (row, len(useason[row]))
-        else:
-            title = "%s сезон" % (row)
+
         season_id = str(row)
         poster = "http://covers.s4me.ru/season/big/%s.jpg" % season[row]
         thumb = Function(utils.Thumb, url=poster)
@@ -308,8 +297,7 @@ def show_seasons(id, soap_title):
                     show_episodes, sid=id, season=season_id,
                     soap_title=soap_title,
                 ),
-                episode_count=len(
-                    s_length[row]) if s_length else len(useason[row]),
+                episode_count=len(useason[row]),
                 show=soap_title,
                 rating_key=str(row),
                 title=title,
@@ -323,109 +311,133 @@ def show_seasons(id, soap_title):
 def show_episodes(sid, season, soap_title):
 
     container = ObjectContainer(title2=u'%s - %s сезон ' % (soap_title, season))
-    url = API_URL + 'episodes/' + sid
-    data = utils.GET(url)
+    episodes = utils.GetEpisodes(sid)
     quality = Prefs["quality"]
     sort = Prefs["sorting"]
     show_only_hd = False
 
+    episodes = [x for x in episodes if x['season'] == season]
+
     if quality == "HD":
-        for episode in data:
+        for episode in episodes:
+            Log.Debug('episode: {}'.format(json.dumps(episode, indent=2)))
             if season == episode['season']:
                 if episode['quality'] == '720p':
                     show_only_hd = True
                     break
+
+    if quality == 'HD' and show_only_hd:
+        episodes = [x for x in episodes if x['quality'] == '720p']
+
+    if quality == 'SD' and not show_only_hd:
+        episodes = [x for x in episodes if x['quality'] == 'SD']
+
+    if Dict['filters']['new']:
+        episodes = [x for x in episodes if x['watched'] == None]
+
+    Log.Debug('sorting: {}'.format(sort))
     if sort != 'да':
-        data = reversed(data)
+        Log.Debug("reversing episodes")
+        episodes = reversed(episodes)
 
-    for row in data:
-        if season == row['season']:
+    for row in episodes:
+        eid = row["eid"]
+        ehash = row['hash']
+        sid = row['sid']
 
-            if quality == "HD" and show_only_hd == True and row['quality'] != '720p':
-                continue
-            elif quality == "SD" and show_only_hd == False and row['quality'] != 'SD':
-                continue
-            else:
-                if row['watched'] != None and Dict['filters']['new']:
-                    continue
-                else:
-                    eid = row["eid"]
-                    ehash = row['hash']
-                    sid = row['sid']
-                    title = ''
-                    if not row['watched'] and not Dict['filters']['new']:
-                        title += '* '
-                    title += "S" + str(row['season']) \
-                        + "E" + str(row['episode']) + " | " \
-                        + row['quality'].encode('utf-8') + " | " \
-                        + row['translate'].encode('utf-8') + " | " \
-                        + row['title_en'].encode('utf-8').replace(
-                            '&#039;', "'"
-                        ).replace("&amp;", "&").replace('&quot;', '"')
-                    poster = "http://covers.s4me.ru/season/big/%s.jpg" % row['season_id']
-                    summary = row['spoiler']
-                    thumb = Function(utils.Thumb, url=poster)
-                    parts = [
-                        PartObject(
-                            key=Callback(
-                                episode_url,
-                                sid=sid,
-                                eid=eid,
-                                ehash=ehash,
-                                part=0
-                            )
-                        )
-                    ]
-                    if Prefs["mark_watched"] == 'да':
-                        parts.append(
-                            PartObject(
-                                key=Callback(
-                                    episode_url,
-                                    sid=sid,
-                                    eid=eid,
-                                    ehash=ehash,
-                                    part=1
-                                )
-                            )
-                        )
-                    container.add(EpisodeObject(
-                        key=Callback(play_episode, sid=sid,
-                                     eid=eid, ehash=ehash, row=row),
-                        rating_key='soap4me' + row["eid"],
-                        title=title,
-                        index=int(row['episode']),
-                        thumb=thumb,
-                        summary=summary,
-                        items=[MediaObject(parts=parts)]
-                    ))
+        title = utils.MakeTitle(row)
+        poster = "http://covers.s4me.ru/season/big/%s.jpg" % row['season_id']
+        summary = row['spoiler']
+        thumb = Function(utils.Thumb, url=poster)
+        parts = [
+            PartObject(
+                key=Callback(
+                    episode_url,
+                    sid=sid,
+                    eid=eid,
+                    ehash=ehash,
+                    part=0
+                )
+            )
+        ]
+        if Prefs["mark_watched"] == 'да':
+            parts.append(
+                PartObject(
+                    key=Callback(
+                        episode_url,
+                        sid=sid,
+                        eid=eid,
+                        ehash=ehash,
+                        part=1
+                    )
+                )
+            )
+
+        container.add(EpisodeObject(
+            key=Callback(
+                play_episode,
+                sid=sid,
+                eid=eid,
+                ehash=ehash,
+                row=row
+            ),
+            rating_key='soap4me' + row["eid"],
+            title=title,
+            index=int(row['episode']),
+            thumb=thumb,
+            summary=summary,
+            items=[MediaObject(parts=parts)]
+        ))
     return container
 
 
 def play_episode(sid, eid, ehash, row, *args, **kwargs):
-    oc = ObjectContainer()
-    parts = [PartObject(key=Callback(episode_url, sid=sid,
-                                     eid=eid, ehash=ehash, part=0))]
+    container = ObjectContainer()
+    parts = [
+        PartObject(
+            key=Callback(
+                episode_url,
+                sid=sid,
+                eid=eid,
+                ehash=ehash,
+                part=0
+            )
+        )
+    ]
     if Prefs["mark_watched"] == 'да':
-        parts.append(PartObject(key=Callback(
-            episode_url, sid=sid, eid=eid, ehash=ehash, part=1)))
-    oc.add(EpisodeObject(
-        key=Callback(play_episode, sid=sid, eid=eid, ehash=ehash, row=row),
-        rating_key='soap4me' + row["eid"],
-        items=[MediaObject(
-            video_resolution=720 if row['quality'].encode(
-                'utf-8') == '720p' else 400,
-            video_codec=VideoCodec.H264,
-            audio_codec=AudioCodec.AAC,
-            container=Container.MP4,
-            optimized_for_streaming=True,
-            audio_channels=2,
-            parts=parts
-        )]
-    ))
-    return oc
+        parts.append(PartObject(
+            key=Callback(
+                episode_url,
+                sid=sid,
+                eid=eid,
+                ehash=ehash,
+                part=1
+            )
+        ))
+
+    container.add(
+        EpisodeObject(
+            key=Callback(play_episode, sid=sid, eid=eid, ehash=ehash, row=row),
+            rating_key='soap4me' + row["eid"],
+            items=[MediaObject(
+                video_resolution=720 if row['quality'].encode(
+                    'utf-8') == '720p' else 400,
+                video_codec=VideoCodec.H264,
+                audio_codec=AudioCodec.AAC,
+                container=Container.MP4,
+                optimized_for_streaming=True,
+                audio_channels=2,
+                parts=parts
+            )]
+        )
+    )
+    return container
 
 
 def episode_url(sid, eid, ehash, part):
+    Log.Debug("[episode url] sid: {}; eid: {}; ehash: {}; part: {}".format(
+        sid, eid, ehash, part,
+    ))
     token = Dict['token']
     if part == 1:
         params = {"what": "mark_watched", "eid": eid, "token": token}
@@ -437,10 +449,12 @@ def episode_url(sid, eid, ehash, part):
                 'Cookie': 'PHPSESSID=' + Dict['sid']
             }
         )
+        Log.Debug("marked: {}".format(json.dumps(data, indent=2)))
         return Redirect('https://soap4.me/assets/blank/blank1.mp4')
 
-    myhash = hashlib.md5(str(token) + str(eid) +
-                         str(sid) + str(ehash)).hexdigest()
+    myhash = hashlib.md5(
+        str(token) + str(eid) + str(sid) + str(ehash)
+    ).hexdigest()
     params = {
         "what": "player",
         "do": "load",
@@ -459,3 +473,4 @@ def episode_url(sid, eid, ehash, part):
     #Log.Debug('!!!!!!!!!!!!!!!!!! === ' + str(data))
     if data["ok"] == 1:
         return Redirect("http://%s.soap4.me/%s/%s/%s/" % (data['server'], token, eid, myhash))
+

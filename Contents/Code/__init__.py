@@ -39,17 +39,23 @@ def Start():
 def Login():
 	global LOGGEDIN, SID, TOKEN
 
-	if not Prefs['username'] and not Prefs['password']:
+	username = Prefs['username']
+	password = Prefs['password']
+
+	if not username or not password:
+		Log.Debug("No user or password in settings")
 		return 2
 	else:
 
 		try:
 			values = {
-				'login' : Prefs["username"],
-				'password' : Prefs["password"]}
+				'login':    username,
+				'password': password,
+			}
 
 			obj = JSON.ObjectFromURL(LOGIN_URL, values, encoding='utf-8', cacheTime=1,)
-		except:
+		except Exception as e:
+			Log.Debug("can't log in: {}".format(e))
 			obj=[]
 			LOGGEDIN = False
 			return 3

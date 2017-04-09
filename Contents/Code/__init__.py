@@ -8,10 +8,11 @@ import re,urllib2,base64,hashlib,md5,urllib
 import calendar
 from datetime import *
 import time
+import json
 
 VERSION = 2.0
 PREFIX = "/video/soap4meNew"
-TITLE = 'soap4.me'
+TITLE = 'soap4.me (new)'
 ART = 'art.png'
 ICON = 'icon.png'
 BASE_URL = 'http://soap4.me/'

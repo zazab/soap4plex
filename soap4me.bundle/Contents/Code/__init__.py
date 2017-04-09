@@ -10,7 +10,7 @@ from datetime import *
 import time
 
 VERSION = 2.0
-PREFIX = "/video/soap4me"
+PREFIX = "/video/soap4meNew"
 TITLE = 'soap4.me'
 ART = 'art.png'
 ICON = 'icon.png'

@@ -1,0 +1,36 @@
+[
+    {
+        "id": "username",
+        "type": "text",
+        "label": "Пользователь",
+        "default": ""
+    },
+    {
+        "id": "password",
+        "type": "text",
+        "label": "Пароль",
+        "default": "",
+        "option": "hidden"
+    },
+    {
+        "id": "quality",
+        "label": "Предпочитаемое качество",
+        "default": "SD",
+        "values": ["SD","HD","SD+HD"],
+        "type": "enum"
+    },
+    {
+        "id": "sorting",
+        "label": "Новые эпизоды сверху",
+        "default": "да",
+        "values": ["да","нет"],
+        "type": "enum"
+    },
+    {
+        "id": "mark_watched",
+        "label": "Автоматически отмечать просмотр эпизода",
+        "default": "да",
+        "values": ["да","нет"],
+        "type": "enum"
+    }
+]

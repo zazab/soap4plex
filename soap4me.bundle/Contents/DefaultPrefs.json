@@ -14,7 +14,6 @@
     },
     {
         "id": "quality",
-        "type": "text",
         "label": "Предпочитаемое качество",
         "default": "SD",
         "values": ["SD","HD","SD+HD"],
@@ -22,7 +21,6 @@
     },
     {
         "id": "sorting",
-        "type": "text",
         "label": "Новые эпизоды сверху",
         "default": "да",
         "values": ["да","нет"],
@@ -30,10 +28,9 @@
     },
     {
         "id": "mark_watched",
-        "type": "text",
         "label": "Автоматически отмечать просмотр эпизода",
         "default": "да",
         "values": ["да","нет"],
         "type": "enum"
-    },
+    }
 ]

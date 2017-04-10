@@ -17,6 +17,7 @@ import json
 
 import utils
 import soap
+import plex
 
 VERSION = 2.0
 PREFIX = "/video/soap4meNew"
@@ -91,45 +92,37 @@ def Login():
                 "Ошибка",
                 "Отказано в доступе"
             )
-            
+
 
 @handler(PREFIX, TITLE, thumb=utils.ICON, art=ART)
 def MainMenu():
 
     container = ObjectContainer()
-    container.add(
-        DirectoryObject(
-            key=Callback(
-                Soaps, title2=u'Все сериалы', filters={
-                    "my": False,
-                    "new": False,
-                }
-            ),
-            title=u'Все сериалы'
-        )
-    )
-    container.add(
-        DirectoryObject(
-            key=Callback(
-                Soaps, title2=u'Я смотрю', filters={
-                    "my": True,
-                    "new": False,
-                }
-            ),
-            title=u'Я смотрю'
-        )
-    )
-    container.add(
-        DirectoryObject(
-            key=Callback(
-                Soaps, title2=u'Новые эпизоды', filters={
-                    "my": True,
-                    "new": True,
-                }
-            ),
-            title=u'Новые эпизоды'
-        )
-    )
+    container.add(plex.makeMenuItem(
+        Soaps,
+        title=u'Все сериалы',
+        filters={
+            'my': False,
+            'new': False
+        }
+    ))
+    container.add(plex.makeMenuItem(
+        Soaps,
+        title=u'Я смотрю',
+        filters={
+            "my": True,
+            "new": False,
+        }
+    ))
+    container.add(plex.makeMenuItem(
+        Soaps,
+        title=u'Новые эпизоды',
+        filters={
+            "my": True,
+            "new": True,
+        }
+    ))
+
     container.add(PrefsObject(title=u'Настройки', thumb=R('settings.png')))
 
     return container
@@ -137,21 +130,19 @@ def MainMenu():
 
 @route(PREFIX + '/filters')
 def Filters(title2):
+    '''
     letters = soap.GetSoapsLetters()
 
     container = ObjectContainer(title2=u'Filters')
-
     container.add(
-        PopupDirectoryObject(
-            key=Callback(
-                StartsWithFilters,
-                title2=title2,
-            ),
+        plex.makePopupDirectory(
+            StartsWithFilters,
             title=u'Starts with',
         )
     )
+    '''
 
-    return container
+    return StartsWithFilters(title2)
 
 @route(PREFIX + '/filters/letter')
 def StartsWithFilters(title2):
@@ -192,10 +183,6 @@ def Soaps(title2, filters={}):
     if filters != {}:
         Log.Debug("setting filters: %s".format(json.dumps(filters, indent=2)))
         Dict['filters'] = filters
-    else:
-        filters = Dict['filters']
-
-    Log.Debug('filters: {}'.format(json.dumps(filters, indent=2)))
 
     error = Login()
     if error != None:
@@ -209,192 +196,66 @@ def Soaps(title2, filters={}):
         )
     )
 
-    soaps = soap.GetSoaps()
+    soaps = soap.get_soaps()
+    soaps = utils.filter_by_letter(soaps)
 
-    try:
-        new = filters['new']
-    except KeyError:
-        new = False
+    for item in soaps:
 
-    if new:
-        soaps = [x for x in soaps if x['unwatched'] != None]
-
-    try:
-        letter = filters['letter']
-    except KeyError:
-        letter = None
-
-    if letter != None:
-        soaps = [x for x in soaps if x['title'][0] == letter]
-
-    for items in soaps:
-        soap_title = items["title"]
-        title = soap_title
-        if new:
-            title = items["title"] + " (" + str(items["unwatched"]) + ")"
-
-        summary = items["description"]
-        poster = 'http://covers.s4me.ru/soap/big/' + items["sid"] + '.jpg'
-        rating = float(items["imdb_rating"])
-        summary = summary.replace('&quot;', '"')
-        fan = 'http://thetvdb.com/banners/fanart/original/' + \
-            items['tvdb_id'] + '-1.jpg'
-        id = items["sid"]
-        thumb = Function(utils.Thumb, url=poster)
-
-        container.add(
-            TVShowObject(
-                key=Callback(
-                    show_seasons, id=id, soap_title=soap_title,
-                ),
-                rating_key=str(id),
-                title=title,
-                summary=summary,
-                art=fan,
-                rating=rating,
-                thumb=thumb
-            )
-        )
+        container.add(plex.make_tvshow_item(show_seasons, item))
     return container
 
 
-@route(PREFIX + '/soaps/{id}')
-def show_seasons(id, soap_title):
+@route(PREFIX + '/soaps/{soap_id}')
+def show_seasons(soap_id, soap_title):
+    seasons = {}
+    season_episodes = {}
 
-    container = ObjectContainer(title2=soap_title)
-    episodes = soap.GetEpisodes(id)
-
-    season = {}
-    useason = {}
-
-    new = Dict['filters']['new']
-
-    if new:
-        episodes = [x for x in episodes if x['watched'] == None]
+    episodes = soap.get_episodes(soap_id)
 
     for episode in episodes:
-        seasonNum = int(episode['season'])
-        episodeNum = int(episode['episode'])
+        season_num = int(episode['season'])
+        episode_num = int(episode['episode'])
 
-        if seasonNum not in season:
-            season[seasonNum] = episode['season_id']
+        if season_num not in seasons:
+            seasons[season_num] = episode['season_id']
 
-        if seasonNum not in useason.keys():
-            useason[seasonNum] = []
+        if season_num not in season_episodes:
+            season_episodes[season_num] = []
 
-        if episodeNum not in useason[seasonNum]:
-            useason[seasonNum].append(episodeNum)
+        if episode_num not in season_episodes[season_num]:
+            season_episodes[season_num].append(episode_num)
 
-    for row in season:
-        title = "%s сезон" % (row)
-        if new:
-            title = "%s сезон (%s)" % (row, len(useason[row]))
+    container = ObjectContainer(title2=soap_title)
 
-        season_id = str(row)
-        poster = "http://covers.s4me.ru/season/big/%s.jpg" % season[row]
-        thumb = Function(utils.Thumb, url=poster)
+    for season in seasons:
+        season_id = seasons[season]
         container.add(
-            SeasonObject(
-                key=Callback(
-                    show_episodes, sid=id, season=season_id,
-                    soap_title=soap_title,
-                ),
-                episode_count=len(useason[row]),
-                show=soap_title,
-                rating_key=str(row),
-                title=title,
-                thumb=thumb
+            plex.make_season_item(
+                show_episodes,
+                soap_id, soap_title,
+                season, season_id,
+                season_episodes,
             )
         )
+
     return container
 
 
 @route(PREFIX + '/soaps/{sid}/{season}', allow_sync=True)
 def show_episodes(sid, season, soap_title):
-
     container = ObjectContainer(title2=u'%s - %s сезон ' % (soap_title, season))
-    episodes = soap.GetEpisodes(sid)
-    quality = Prefs["quality"]
-    sort = Prefs["sorting"]
-    show_only_hd = False
 
-    episodes = [x for x in episodes if x['season'] == season]
+    episodes = soap.get_season_episodes(sid, season)
+    episodes = utils.filter_episodes_by_quality(episodes)
 
-    if quality == "HD":
-        for episode in episodes:
-            Log.Debug('episode: {}'.format(json.dumps(episode, indent=2)))
-            if season == episode['season']:
-                if episode['quality'] == '720p':
-                    show_only_hd = True
-                    break
+    for episode in episodes:
+        container.add(plex.make_episode_item(play_episode, episode_url, episode))
 
-    if quality == 'HD' and show_only_hd:
-        episodes = [x for x in episodes if x['quality'] == '720p']
-
-    if quality == 'SD' and not show_only_hd:
-        episodes = [x for x in episodes if x['quality'] == 'SD']
-
-    if Dict['filters']['new']:
-        episodes = [x for x in episodes if x['watched'] == None]
-
-    Log.Debug('sorting: {}'.format(sort))
-    if sort != 'да':
-        Log.Debug("reversing episodes")
-        episodes = reversed(episodes)
-
-    for row in episodes:
-        eid = row["eid"]
-        ehash = row['hash']
-        sid = row['sid']
-
-        title = utils.MakeTitle(row)
-        poster = "http://covers.s4me.ru/season/big/%s.jpg" % row['season_id']
-        summary = row['spoiler']
-        thumb = Function(utils.Thumb, url=poster)
-        parts = [
-            PartObject(
-                key=Callback(
-                    episode_url,
-                    sid=sid,
-                    eid=eid,
-                    ehash=ehash,
-                    part=0
-                )
-            )
-        ]
-        if Prefs["mark_watched"] == 'да':
-            parts.append(
-                PartObject(
-                    key=Callback(
-                        episode_url,
-                        sid=sid,
-                        eid=eid,
-                        ehash=ehash,
-                        part=1
-                    )
-                )
-            )
-
-        container.add(EpisodeObject(
-            key=Callback(
-                play_episode,
-                sid=sid,
-                eid=eid,
-                ehash=ehash,
-                row=row
-            ),
-            rating_key='soap4me' + row["eid"],
-            title=title,
-            index=int(row['episode']),
-            thumb=thumb,
-            summary=summary,
-            items=[MediaObject(parts=parts)]
-        ))
     return container
 
 
 def play_episode(sid, eid, ehash, row, *args, **kwargs):
-    container = ObjectContainer()
+    container = ObjectContainer(title2=utils.make_title(row))
     parts = [
         PartObject(
             key=Callback(
@@ -436,7 +297,7 @@ def play_episode(sid, eid, ehash, row, *args, **kwargs):
     return container
 
 
-def episode_url(sid, eid, ehash, part):
+def episode_url(sid, eid, ehash, part, *args, **kwargs):
     Log.Debug("[episode url] sid: {}; eid: {}; ehash: {}; part: {}".format(
         sid, eid, ehash, part,
     ))

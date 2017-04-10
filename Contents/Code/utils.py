@@ -22,7 +22,7 @@ def GET(url):
     )
 
 
-def MakeTitle(episode):
+def make_title(episode):
     new = ''
     if not episode['watched']:
         new = '* '
@@ -36,3 +36,49 @@ def MakeTitle(episode):
         new, season, episodeString,
         quality, translate, title,
     )
+
+
+def filter_unwatched_soaps(soaps):
+    watched = Dict['filters']['new']
+    if watched:
+        soaps = [x for x in soaps if x['unwatched'] is not None]
+        Log.Debug('{} filtered soaps'.format(len(soaps)))
+
+    return soaps
+
+
+def filter_unwatched_episodes(episodes):
+    watched = Dict['filters']['new']
+    if watched:
+        soaps = [x for x in episodes if x['watched'] is None]
+
+    return soaps
+
+
+def filter_by_letter(soaps):
+    try:
+        letter = Dict['filters']['letter']
+    except KeyError:
+        letter = None
+
+    if letter != None:
+        soaps = [x for x in soaps if x['title'][0] == letter]
+
+    return soaps
+
+
+def filter_episodes_by_quality(episodes):
+    quality = Prefs["quality"]
+    only_hd = False
+
+    if quality == "HD":
+        for episode in episodes:
+            Log.Debug('episode: {}'.format(json.dumps(episode, indent=2)))
+            if episode['quality'] == '720p':
+                only_hd = True
+                break
+
+    if quality == 'HD' and only_hd:
+        return [x for x in episodes if x['quality'] == '720p']
+
+    return [x for x in episodes if x['quality'] == 'SD']

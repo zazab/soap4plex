@@ -2,7 +2,7 @@ import utils
 
 API_URL = 'http://soap4.me/api/'
 
-def GetSoaps():
+def get_soaps():
     filters = Dict['filters']
 
     url = API_URL + 'soap/'
@@ -12,20 +12,29 @@ def GetSoaps():
     soaps = utils.GET(url)
     soaps = sorted(soaps, key=lambda k: k['title'])
 
-    return soaps
+    Log.Debug("got {} soaps".format(len(soaps)))
+
+    return utils.filter_unwatched_soaps(soaps)
 
 
-def GetEpisodes(id):
-    filters = Dict['filters']
-
-    url = API_URL + 'episodes/' + id
+def get_episodes(soap_id):
+    url = API_URL + 'episodes/' + soap_id
     episodes = utils.GET(url)
 
-    return episodes
+    return utils.filter_unwatched_episodes(episodes)
+
+
+def get_season_episodes(soap_id, season):
+    episodes = get_episodes(soap_id)
+
+    if Prefs['sorting'] != 'да':
+        episodes = reversed(episodes)
+
+    return [x for x in episodes if x['season'] == season]
 
 
 def GetSoapsLetters():
-    soaps = GetSoaps()
+    soaps = get_soaps()
 
     letters = []
     for item in soaps:

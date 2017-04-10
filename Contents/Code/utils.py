@@ -1,4 +1,3 @@
-API_URL = 'http://soap4.me/api/'
 ICON = 'icon.png'
 
 def Thumb(url):
@@ -10,40 +9,6 @@ def Thumb(url):
             return DataObject(data, 'image/jpeg')
         except:
             return Redirect(R(ICON))
-
-
-def GetSoaps():
-    filters = Dict['filters']
-
-    url = API_URL + 'soap/'
-    if filters['my']:
-        url = API_URL + 'soap/my/'
-
-    soaps = GET(url)
-    soaps = sorted(soaps, key=lambda k: k['title'])
-
-    return soaps
-
-
-def GetEpisodes(id):
-    filters = Dict['filters']
-
-    url = API_URL + 'episodes/' + id
-    episodes = GET(url)
-
-    return episodes
-
-
-def GetSoapsLetters():
-    soaps = GetSoaps()
-
-    letters = []
-    for item in soaps:
-        letter = item['title'][0]
-        if letter not in letters:
-            letters.append(letter)
-    
-    return letters
 
 
 def GET(url):

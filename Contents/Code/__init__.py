@@ -14,7 +14,9 @@ import calendar
 from datetime import *
 import time
 import json
+
 import utils
+import soap
 
 VERSION = 2.0
 PREFIX = "/video/soap4meNew"
@@ -135,7 +137,7 @@ def MainMenu():
 
 @route(PREFIX + '/filters')
 def Filters(title2):
-    letters = utils.GetSoapsLetters()
+    letters = soap.GetSoapsLetters()
 
     container = ObjectContainer(title2=u'Filters')
 
@@ -153,7 +155,7 @@ def Filters(title2):
 
 @route(PREFIX + '/filters/letter')
 def StartsWithFilters(title2):
-    letters = utils.GetSoapsLetters()
+    letters = soap.GetSoapsLetters()
 
     container = ObjectContainer(title2=u'Starts With')
 
@@ -207,7 +209,7 @@ def Soaps(title2, filters={}):
         )
     )
 
-    soaps = utils.GetSoaps()
+    soaps = soap.GetSoaps()
 
     try:
         new = filters['new']
@@ -260,7 +262,7 @@ def Soaps(title2, filters={}):
 def show_seasons(id, soap_title):
 
     container = ObjectContainer(title2=soap_title)
-    episodes = utils.GetEpisodes(id)
+    episodes = soap.GetEpisodes(id)
 
     season = {}
     useason = {}
@@ -311,7 +313,7 @@ def show_seasons(id, soap_title):
 def show_episodes(sid, season, soap_title):
 
     container = ObjectContainer(title2=u'%s - %s сезон ' % (soap_title, season))
-    episodes = utils.GetEpisodes(sid)
+    episodes = soap.GetEpisodes(sid)
     quality = Prefs["quality"]
     sort = Prefs["sorting"]
     show_only_hd = False

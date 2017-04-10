@@ -32,7 +32,7 @@ def make_title(episode):
     quality = episode['quality'].encode('utf-8')
     translate = episode['translate'].encode('utf-8')
     title = episode['title_en'].encode('utf-8').replace('&#039;', "'")
-    return '{}{}{} | {} | {} | {}'.format(
+    return u'{}{}{} | {} | {} | {}'.format(
         new, season, episodeString,
         quality, translate, title,
     )

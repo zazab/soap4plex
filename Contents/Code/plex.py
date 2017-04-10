@@ -48,7 +48,7 @@ def make_season_item(callback, soapID, soapTitle, season, seasonID, episodes):
     return SeasonObject(
         key=Callback(
             callback,
-            sid=soapID,
+            soap_id=soapID,
             season=seasonStr,
             soap_title=soapTitle,
         ),
@@ -94,18 +94,29 @@ def make_episode_item(play, url, episode):
             )
         )
 
+    resolution = 400
+    if episode['quality'].encode('utf-8') == '720p':
+        resolution = 720
+
     return EpisodeObject(
         key=Callback(
             play,
-            sid=sid,
-            eid=eid,
-            ehash=ehash,
-            row=episode
+            episode=episode
         ),
         rating_key='soap4me' + eid,
         title=title,
         index=int(episode['episode']),
         thumb=thumb,
         summary=summary,
-        items=[MediaObject(parts=parts)]
+        items=[
+            MediaObject(
+                video_resolution=resolution,
+                video_codec=VideoCodec.H264,
+                audio_codec=AudioCodec.AAC,
+                container=Container.MP4,
+                optimized_for_streaming=True,
+                audio_channels=1,
+                parts=parts
+            )
+        ]
     )

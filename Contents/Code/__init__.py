@@ -242,10 +242,10 @@ def show_seasons(soap_id, soap_title):
 
 
 @route(PREFIX + '/soaps/{sid}/{season}', allow_sync=True)
-def show_episodes(sid, season, soap_title):
+def show_episodes(soap_id, season, soap_title):
     container = ObjectContainer(title2=u'%s - %s сезон ' % (soap_title, season))
 
-    episodes = soap.get_season_episodes(sid, season)
+    episodes = soap.get_season_episodes(soap_id, season)
     episodes = utils.filter_episodes_by_quality(episodes)
 
     for episode in episodes:
@@ -254,46 +254,13 @@ def show_episodes(sid, season, soap_title):
     return container
 
 
-def play_episode(sid, eid, ehash, row, *args, **kwargs):
-    container = ObjectContainer(title2=utils.make_title(row))
-    parts = [
-        PartObject(
-            key=Callback(
-                episode_url,
-                sid=sid,
-                eid=eid,
-                ehash=ehash,
-                part=0
-            )
-        )
-    ]
-    if Prefs["mark_watched"] == 'да':
-        parts.append(PartObject(
-            key=Callback(
-                episode_url,
-                sid=sid,
-                eid=eid,
-                ehash=ehash,
-                part=1
-            )
-        ))
+def play_episode(episode, *args, **kwargs):
+    Log.Debug('args: {}'.format(json.dumps(args, indent=2)))
+    Log.Debug('kwargs: {}'.format(json.dumps(kwargs, indent=2)))
+    container = ObjectContainer(title2=utils.make_title(episode))
 
-    container.add(
-        EpisodeObject(
-            key=Callback(play_episode, sid=sid, eid=eid, ehash=ehash, row=row),
-            rating_key='soap4me' + row["eid"],
-            items=[MediaObject(
-                video_resolution=720 if row['quality'].encode(
-                    'utf-8') == '720p' else 400,
-                video_codec=VideoCodec.H264,
-                audio_codec=AudioCodec.AAC,
-                container=Container.MP4,
-                optimized_for_streaming=True,
-                audio_channels=2,
-                parts=parts
-            )]
-        )
-    )
+    container.add(plex.make_episode_item(play_episode, episode_url, episode))
+
     return container
 
 

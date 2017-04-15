@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+'''
+soap4.me plex plugin
+'''
 
 # created by sergio
 # updated by kestl1st@gmail.com (@kestl) v.1.2.3 2016-08-01

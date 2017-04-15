@@ -1,0 +1,6 @@
+// Place your settings in this file to overwrite default and user settings.
+{
+    "python.pythonPath": "c:\\Program Files (x86)\\Python36-32\\python",
+    "python.linting.pylintPath": "c:\\Program Files (x86)\\Python36-32\\python",
+    "python.linting.pylintArgs": ["-m", "pylint"]
+}

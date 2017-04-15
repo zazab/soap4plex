@@ -5,17 +5,13 @@
 # updated by sergio v.1.2.2 2014-08-28
 
 import re
-import urllib2
-import base64
 import hashlib
-import md5
 import urllib
 import calendar
-from datetime import *
 import time
 import json
 
-import utils
+import locutils
 import soap
 import plex
 
@@ -23,99 +19,44 @@ VERSION = 2.0
 PREFIX = "/video/soap4meNew"
 TITLE = 'soap4.me (new)'
 ART = 'art.png'
-API_URL = 'http://soap4.me/api/'
-LOGIN_URL = 'http://soap4.me/login/'
 USER_AGENT = 'xbmc for soap'
-LOGGEDIN = False
-TOKEN = False
-SID = ''
 
 
 def Start():
     ObjectContainer.art = R(ART)
     ObjectContainer.title1 = TITLE
-    DirectoryObject.thumb = R(utils.ICON)
+    DirectoryObject.thumb = R(locutils.ICON)
 
     HTTP.CacheTime = CACHE_1HOUR
     HTTP.Headers['User-Agent'] = USER_AGENT
     HTTP.Headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
     HTTP.Headers['Accept-Encoding'] = 'gzip,deflate,sdch'
     HTTP.Headers['Accept-Language'] = 'ru-ru,ru;q=0.8,en-us;q=0.5,en;q=0.3'
-    HTTP.Headers['x-api-token'] = TOKEN
 
 
-def Login():
-    global LOGGEDIN, SID, TOKEN
-
-    username = Prefs['username']
-    password = Prefs['password']
-
-    if not username or not password:
-        Log.Debug("No user or password in settings")
-        return MessageContainer(
-            "Ошибка",
-            "Ведите пароль и логин"
-        )
-    else:
-
-        try:
-            values = {
-                'login':    username,
-                'password': password,
-            }
-
-            obj = JSON.ObjectFromURL(
-                LOGIN_URL,
-                values,
-                encoding='utf-8',
-                cacheTime=1
-            )
-        except Exception as e:
-            Log.Debug("can't log in: {}".format(e))
-            obj = []
-            LOGGEDIN = False
-            return 3
-
-        SID = obj['sid']
-        TOKEN = obj['token']
-        if len(TOKEN) > 0:
-            LOGGEDIN = True
-            Dict['sid'] = SID
-            Dict['token'] = TOKEN
-
-            return None
-        else:
-            LOGGEDIN = False
-            Dict['sessionid'] = ""
-
-            return MessageContainer(
-                "Ошибка",
-                "Отказано в доступе"
-            )
-
-
-@handler(PREFIX, TITLE, thumb=utils.ICON, art=ART)
-def MainMenu():
+@handler(PREFIX, TITLE, thumb=locutils.ICON, art=ART)
+def main_menu():
+    "makes main menu"
 
     container = ObjectContainer()
-    container.add(plex.makeMenuItem(
-        Soaps,
+    container.add(plex.make_menu_item(
+        soaps,
         title=u'Все сериалы',
         filters={
             'my': False,
             'new': False
         }
     ))
-    container.add(plex.makeMenuItem(
-        Soaps,
+    container.add(plex.make_menu_item(
+        soaps,
         title=u'Я смотрю',
         filters={
             "my": True,
             "new": False,
         }
     ))
-    container.add(plex.makeMenuItem(
-        Soaps,
+    container.add(plex.make_menu_item(
+        soaps,
         title=u'Новые эпизоды',
         filters={
             "my": True,
@@ -124,37 +65,37 @@ def MainMenu():
     ))
 
     container.add(PrefsObject(title=u'Настройки', thumb=R('settings.png')))
-
     return container
 
 
 @route(PREFIX + '/filters')
-def Filters(title2):
+def set_filters(title2):
     '''
-    letters = soap.GetSoapsLetters()
+    letters = soap.get_soaps_letters()
 
     container = ObjectContainer(title2=u'Filters')
     container.add(
         plex.makePopupDirectory(
-            StartsWithFilters,
+            starts_with_filter,
             title=u'Starts with',
         )
     )
     '''
 
-    return StartsWithFilters(title2)
+    return starts_with_filter(title2)
 
 @route(PREFIX + '/filters/letter')
-def StartsWithFilters(title2):
-    letters = soap.GetSoapsLetters()
+def starts_with_filter(title2):
+    'shows filter by first letter'
 
+    letters = soap.get_soaps_letters()
     container = ObjectContainer(title2=u'Starts With')
 
     for letter in letters:
         container.add(
-            PopupDirectoryObject(
+            DirectoryObject(
                 key=Callback(
-                    SetLetterFilter,
+                    set_letter_filter,
                     title2=title2,
                     letter=letter,
                 ),
@@ -166,7 +107,9 @@ def StartsWithFilters(title2):
 
 
 @route(PREFIX + '/filters/letter/{letter}')
-def SetLetterFilter(letter, title2):
+def set_letter_filter(letter, title2):
+    "sets letter filter"
+
     filters = Dict['filters']
     filters['letter'] = letter
 
@@ -174,30 +117,31 @@ def SetLetterFilter(letter, title2):
     Dict['filters'] = filters
     Log.Debug('filters set')
 
-    return Soaps(title2)
+    return soaps(title2)
 
 
 @route(PREFIX + '/soaps', filters={})
-def Soaps(title2, filters={}):
+def soaps(title2, filters=None):
+    'show soaps'
 
-    if filters != {}:
-        Log.Debug("setting filters: %s".format(json.dumps(filters, indent=2)))
+    if filters != None:
+        Log.Debug("setting filters: {}".format(json.dumps(filters, indent=2)))
         Dict['filters'] = filters
 
-    error = Login()
+    error = soap.login()
     if error != None:
         return error
 
     container = ObjectContainer(title2=title2.decode())
     container.add(
-        PopupDirectoryObject(
-            key=Callback(Filters, title2=title2),
+        DirectoryObject(
+            key=Callback(set_filters, title2=title2),
             title=u'Фильтровать'
         )
     )
 
     soaps = soap.get_soaps()
-    soaps = utils.filter_by_letter(soaps)
+    soaps = locutils.filter_by_letter(soaps)
 
     for item in soaps:
 
@@ -246,7 +190,7 @@ def show_episodes(soap_id, season_num, soap_title):
     container = ObjectContainer(title2=u'%s - %s сезон ' % (soap_title, season_num))
 
     episodes = soap.get_season_episodes(soap_id, season_num)
-    episodes = utils.filter_episodes_by_quality(episodes)
+    episodes = locutils.filter_episodes_by_quality(episodes)
 
     for episode in episodes:
         container.add(plex.make_episode_item(play_episode, episode_url, episode))
@@ -255,17 +199,32 @@ def show_episodes(soap_id, season_num, soap_title):
 
 
 @route(PREFIX + '/soaps/{soap_id}/{season_num}/{episode_num}')
-def play_episode(soap_id, season_num, episode_num, *args, **kwargs):
+def play_episode(soap_id, season_num, episode_num):
     episode_obj = soap.get_episode(soap_id, season_num, episode_num)
-    container = ObjectContainer(title2=utils.make_title(episode_obj))
+    if episode_obj is None:
+        Log.Critical("episode {} not found".format(episode_num))
+        return MessageContainer(
+            "Ошибка",
+            "Эпизод не найден"
+        )
+
+    container = ObjectContainer(title2=locutils.make_title(episode_obj))
     container.add(plex.make_episode_item(play_episode, episode_url, episode_obj))
 
     return container
 
 
 @route(PREFIX + '/soaps/{soap_id}/{season_num}/{episode_num}/play/{part}')
-def episode_url(soap_id, season_num, episode_num, part, *args, **kwargs):
+def episode_url(soap_id, season_num, episode_num, part):
+    'provides specific url for episode'
+
     episode = soap.get_episode(soap_id, season_num, episode_num)
+    if episode is None:
+        Log.Critical("episode s{}e{} not found".format(season_num, episode_num))
+        return MessageContainer(
+            "Ошибка",
+            "Эпизод не найден"
+        )
     Log.Debug("[episode_url] episode: {}".format(json.dumps(episode, indent=2)))
 
     eid = episode['eid']
@@ -298,4 +257,3 @@ def episode_url(soap_id, season_num, episode_num, part, *args, **kwargs):
 
     if data["ok"] == 1:
         return Redirect("http://%s.soap4.me/%s/%s/%s/" % (data['server'], token, eid, myhash))
-

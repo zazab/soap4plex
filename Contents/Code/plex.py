@@ -1,5 +1,10 @@
+# -*- coding: utf-8 -*-
+"plex module"
 
-def makeMenuItem(callback, title, filters):
+import locutils
+
+def make_menu_item(callback, title, filters):
+    "generates simple menu entry"
     return DirectoryObject(
         key=Callback(callback, title2=title, filters=filters),
         title=title
@@ -7,6 +12,7 @@ def makeMenuItem(callback, title, filters):
 
 
 def make_tvshow_item(callback, tvshow):
+    "generates tvshow object"
     soap_title = tvshow["title"]
     title = soap_title
     if Dict['filters']['new']:
@@ -19,7 +25,7 @@ def make_tvshow_item(callback, tvshow):
     fan = 'http://thetvdb.com/banners/fanart/original/' + \
         tvshow['tvdb_id'] + '-1.jpg'
     soap_id = tvshow["sid"]
-    thumb = Function(utils.Thumb, url=poster)
+    thumb = Function(locutils.thumb, url=poster)
 
     Log.Debug('made item for {}'.format(title))
 
@@ -37,19 +43,21 @@ def make_tvshow_item(callback, tvshow):
 
 
 def make_season_item(callback, soap_id, soap_title, season_num, season_id, episodes):
+    "generates season object"
+
     title = "%s сезон" % (season_num)
     if Dict['filters']['new']:
         title = "%s сезон (%s)" % (season_num, len(episodes[season_num]))
 
-    seasonStr = str(season_num)
+    season_str = str(season_num)
     poster = "http://covers.s4me.ru/season/big/%s.jpg" % season_id
-    thumb = Function(utils.Thumb, url=poster)
+    thumb = Function(locutils.thumb, url=poster)
 
     return SeasonObject(
         key=Callback(
             callback,
             soap_id=soap_id,
-            season_num=seasonStr,
+            season_num=season_str,
             soap_title=soap_title,
         ),
         episode_count=len(episodes[season_num]),
@@ -60,6 +68,8 @@ def make_season_item(callback, soap_id, soap_title, season_num, season_id, episo
     )
 
 def make_episode_parts(url_callback, soap_id, season_num, episode_num):
+    "generates episode parts"
+
     parts = [
         PartObject(
             key=Callback(
@@ -89,6 +99,8 @@ def make_episode_parts(url_callback, soap_id, season_num, episode_num):
 
 
 def make_episode_item(play_callback, url_callback, episode):
+    "generates episode object"
+
     eid = episode["eid"]
     Log.Debug("EPISODE ID: {}".format(eid))
     soap_id = episode['sid']
@@ -107,7 +119,7 @@ def make_episode_item(play_callback, url_callback, episode):
             episode_num=episode_num,
         ),
         rating_key='soap4me' + eid,
-        title=utils.make_title(episode),
+        title=locutils.make_title(episode),
         index=int(episode['episode']),
         summary=episode['spoiler'],
         items=[

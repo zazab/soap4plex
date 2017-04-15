@@ -1,0 +1,2 @@
+[VARIABLES]
+additional-builtins=Dict,Log,Prefs,JSON,HTTP,MessageContainer,Redirect,R,Callback,ObjectContainer,DirectoryObject,Function,TVShowObject,SeasonObject,PartObject,EpisodeObject,MediaObject,DataObject,PrefsObject,AudioCodec,VideoCodec,Container,CACHE_1WEEK,CACHE_1HOUR,route,handler

@@ -1,274 +1,261 @@
 # -*- coding: utf-8 -*-
+'''
+soap4me plex plugin
+'''
 
 # created by sergio
 # updated by kestl1st@gmail.com (@kestl) v.1.2.3 2016-08-01
 # updated by sergio v.1.2.2 2014-08-28
 
-import re,urllib2,base64,hashlib,md5,urllib
+import re
+import hashlib
+import urllib
 import calendar
-from datetime import *
 import time
+import json
+
+import locutils
+import soap
+import plex
 
 VERSION = 2.0
-PREFIX = "/video/soap4meNew"
+PREFIX = "/video/soap4me"
 TITLE = 'soap4.me'
 ART = 'art.png'
-ICON = 'icon.png'
-BASE_URL = 'http://soap4.me/'
-API_URL = 'http://soap4.me/api/'
-LOGIN_URL = 'http://soap4.me/login/'
 USER_AGENT = 'xbmc for soap'
-LOGGEDIN = False
-TOKEN = False
-SID = ''
+
 
 def Start():
-	ObjectContainer.art = R(ART)
-	ObjectContainer.title1 = TITLE
-	DirectoryObject.thumb = R(ICON)
+    'plex plugin init function'
 
-	HTTP.CacheTime = CACHE_1HOUR
-	HTTP.Headers['User-Agent'] = USER_AGENT
-	HTTP.Headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-	HTTP.Headers['Accept-Encoding'] ='gzip,deflate,sdch'
-	HTTP.Headers['Accept-Language'] ='ru-ru,ru;q=0.8,en-us;q=0.5,en;q=0.3'
-	HTTP.Headers['x-api-token'] = TOKEN
+    ObjectContainer.art = R(ART)
+    ObjectContainer.title1 = TITLE
+    DirectoryObject.thumb = R(locutils.ICON)
 
-
-def Login():
-	global LOGGEDIN, SID, TOKEN
-
-	if not Prefs['username'] and not Prefs['password']:
-		return 2
-	else:
-
-		try:
-			values = {
-				'login' : Prefs["username"],
-				'password' : Prefs["password"]}
-
-			obj = JSON.ObjectFromURL(LOGIN_URL, values, encoding='utf-8', cacheTime=1,)
-		except:
-			obj=[]
-			LOGGEDIN = False
-			return 3
-		SID = obj['sid']
-		TOKEN = obj['token']
-		if len(TOKEN) > 0:
-			LOGGEDIN = True
-			Dict['sid'] = SID
-			Dict['token'] = TOKEN
-
-			return 1
-		else:
-			LOGGEDIN = False
-			Dict['sessionid'] = ""
-
-			return 3
+    HTTP.CacheTime = CACHE_1HOUR
+    HTTP.Headers['User-Agent'] = USER_AGENT
+    HTTP.Headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+    HTTP.Headers['Accept-Encoding'] = 'gzip,deflate,sdch'
+    HTTP.Headers['Accept-Language'] = 'ru-ru,ru;q=0.8,en-us;q=0.5,en;q=0.3'
 
 
-def Thumb(url):
-	if url=='':
-		return Redirect(R(ICON))
-	else:
-		try:
-			data = HTTP.Request(url, cacheTime=CACHE_1WEEK).content
-			return DataObject(data, 'image/jpeg')
-		except:
-			return Redirect(R(ICON))
+@handler(PREFIX, TITLE, thumb=locutils.ICON, art=ART)
+def main_menu():
+    "makes main menu"
+
+    container = ObjectContainer()
+    container.add(plex.make_menu_item(
+        show_soaps,
+        title=u'Все сериалы',
+        filters={
+            'my': False,
+            'new': False
+        }
+    ))
+    container.add(plex.make_menu_item(
+        show_soaps,
+        title=u'Я смотрю',
+        filters={
+            "my": True,
+            "new": False,
+        }
+    ))
+    container.add(plex.make_menu_item(
+        show_soaps,
+        title=u'Новые эпизоды',
+        filters={
+            "my": True,
+            "new": True,
+        }
+    ))
+
+    container.add(PrefsObject(title=u'Настройки', thumb=R('settings.png')))
+    return container
 
 
-@handler(PREFIX, TITLE, thumb=ICON, art=ART)
-def MainMenu():
+@route(PREFIX + '/filters')
+def set_filters(title2):
+    'shows filter lists'
 
-	oc = ObjectContainer()
-	oc.add(DirectoryObject(key=Callback(Soaps, title2=u'Все сериалы', filter='all'), title=u'Все сериалы'))
-	oc.add(DirectoryObject(key=Callback(Soaps, title2=u'Я смотрю', filter='watching'), title=u'Я смотрю'))
-	oc.add(DirectoryObject(key=Callback(Soaps, title2=u'Новые эпизоды', filter='unwatched'), title=u'Новые эпизоды'))
-	oc.add(PrefsObject(title=u'Настройки', thumb=R('settings.png')))
+    # TODO: add some more filters?
 
-	return oc
+    return starts_with_filter(title2)
 
+@route(PREFIX + '/filters/letter')
+def starts_with_filter(title2):
+    'shows filter by first letter'
 
-@route(PREFIX+'/{filter}')
-def Soaps(title2, filter):
+    letters = soap.get_soaps_letters()
+    container = ObjectContainer(title2=u'Starts With')
 
-	logged = Login()
-	if logged == 2:
-		return MessageContainer(
-			"Ошибка",
-			"Ведите пароль и логин"
-		)
+    for letter in letters:
+        container.add(
+            DirectoryObject(
+                key=Callback(
+                    set_letter_filter,
+                    title2=title2,
+                    letter=letter,
+                ),
+                title=letter,
+            )
+        )
 
-	elif logged == 3:
-		return MessageContainer(
-			"Ошибка",
-			"Отказано в доступе"
-		)
-	else:
-
-		dir = ObjectContainer(title2=title2.decode())
-		if filter == 'all':
-			url = API_URL + 'soap/'
-		else:
-			url = API_URL + 'soap/my/'
-		obj = GET(url)
-
-		obj=sorted(obj, key=lambda k: k['title'])
-
-		for items in obj:
-			if filter == 'unwatched' and items["unwatched"] == None:
-				continue
-			soap_title = items["title"]
-			if filter != 'unwatched':
-				title = soap_title
-			else:
-				title = items["title"]+ " (" +str(items["unwatched"])+ ")"
-			summary = items["description"]
-			poster = 'http://covers.s4me.ru/soap/big/'+items["sid"]+'.jpg'
-			rating = float(items["imdb_rating"])
-			summary = summary.replace('&quot;','"')
-			fan = 'http://thetvdb.com/banners/fanart/original/'+items['tvdb_id']+'-1.jpg'
-			id = items["sid"]
-			thumb = Function(Thumb, url=poster)
-			dir.add(TVShowObject(key=Callback(show_seasons, id = id, soap_title = soap_title, filter = filter, unwatched = filter=='unwatched'), rating_key = str(id), title = title, summary = summary, art = fan,rating = rating, thumb = thumb))
-		return dir
+    return container
 
 
-@route(PREFIX+'/{filter}/{id}', unwatched=bool)
-def show_seasons(id, soap_title, filter, unwatched = False):
+@route(PREFIX + '/filters/letter/{letter}')
+def set_letter_filter(letter, title2):
+    "sets letter filter"
 
-	dir = ObjectContainer(title2 = soap_title)
-	url = API_URL + 'episodes/'+id
-	data = GET(url)
-	season = {}
-	useason = {}
-	s_length = {}
+    filters = Dict['filters']
+    filters['letter'] = letter
 
-	#Log.Debug(str(data))
+    Log.Debug('setting filters: {}'.format(json.dumps(filters, indent=2)))
+    Dict['filters'] = filters
+    Log.Debug('filters set')
 
-	if unwatched:
-		for episode in data:
-			if episode['watched'] == None:
-				if int(episode['season']) not in season:
-					season[int(episode['season'])] = episode['season_id']
-				if int(episode['season']) not in useason.keys():
-					useason[int(episode['season'])] = []
-					useason[int(episode['season'])].append(int(episode['episode']))
-				elif int(episode['episode']) not in useason[int(episode['season'])]:
-					useason[int(episode['season'])].append(int(episode['episode']))
-	else:
-		for episode in data:
-			if int(episode['season']) not in season:
-				season[int(episode['season'])] = episode['season_id']
-				s_length[int(episode['season'])] = [episode['episode'],]
-			else:
-				if episode['episode'] not in s_length[int(episode['season'])]:
-					s_length[int(episode['season'])].append(episode['episode'])
+    return show_soaps(title2)
 
-	for row in season:
-		if unwatched:
-			title = "%s сезон (%s)" % (row, len(useason[row]))
-		else:
-			title = "%s сезон" % (row)
-		season_id = str(row)
-		poster = "http://covers.s4me.ru/season/big/%s.jpg" % season[row]
-		thumb=Function(Thumb, url=poster)
-		dir.add(SeasonObject(key=Callback(show_episodes, sid = id, season = season_id, filter=filter, soap_title=soap_title, unwatched = unwatched), episode_count=len(s_length[row]) if s_length else len(useason[row]), show=soap_title, rating_key=str(row), title = title, thumb = thumb))
-	return dir
 
-@route(PREFIX+'/{filter}/{sid}/{season}', allow_sync=True, unwatched=bool)
-def show_episodes(sid, season, filter, soap_title, unwatched = False):
+@route(PREFIX + '/soaps', filters={})
+def show_soaps(title2, filters=None):
+    'show soaps'
 
-	dir = ObjectContainer(title2 = u'%s - %s сезон ' % (soap_title, season))
-	url = API_URL + 'episodes/'+sid
-	data = GET(url)
-	quality = Prefs["quality"]
-	sort = Prefs["sorting"]
-	show_only_hd = False
+    if filters != None:
+        Log.Debug("setting filters: {}".format(json.dumps(filters, indent=2)))
+        Dict['filters'] = filters
 
-	if quality == "HD":
-		for episode in data:
-			if season == episode['season']:
-				if episode['quality'] == '720p':
-					show_only_hd = True
-					break
-	if sort != 'да':
-		data = reversed(data)
+    error = soap.login()
+    if error != None:
+        return error
 
-	for row in data:
-		if season == row['season']:
+    container = ObjectContainer(title2=title2.decode())
+    container.add(
+        DirectoryObject(
+            key=Callback(set_filters, title2=title2),
+            title=u'Фильтровать'
+        )
+    )
 
-			if quality == "HD" and show_only_hd == True and row['quality'] != '720p':
-				continue
-			elif quality == "SD" and show_only_hd == False and row['quality'] != 'SD':
-				continue
-			else:
-				if row['watched'] != None and unwatched:
-					continue
-				else:
-					eid = row["eid"]
-					ehash = row['hash']
-					sid = row['sid']
-					title = ''
-					if not row['watched'] and not unwatched:
-						title += '* '
-					title += "S" + str(row['season']) \
-							+ "E" + str(row['episode']) + " | " \
-							+ row['quality'].encode('utf-8') + " | " \
-							+ row['translate'].encode('utf-8') + " | " \
-							+ row['title_en'].encode('utf-8').replace('&#039;', "'").replace("&amp;", "&").replace('&quot;','"')
-					poster = "http://covers.s4me.ru/season/big/%s.jpg" % row['season_id']
-					summary = row['spoiler']
-					thumb = Function(Thumb, url=poster)
-					parts = [PartObject(key=Callback(episode_url, sid=sid, eid=eid, ehash=ehash, part=0))]
-					if Prefs["mark_watched"]=='да':
-						parts.append(PartObject(key=Callback(episode_url, sid=sid, eid=eid, ehash=ehash, part=1)))
-					dir.add(EpisodeObject(
-						key=Callback(play_episode, sid = sid, eid = eid, ehash = ehash, row=row),
-						rating_key='soap4me' + row["eid"],
-						title=title,
-						index=int(row['episode']),
-						thumb=thumb,
-						summary=summary,
-						items=[MediaObject(parts=parts)]
-					))
-	return dir
+    soaps = soap.get_soaps()
+    soaps = locutils.filter_by_letter(soaps)
 
-def play_episode(sid, eid, ehash, row, *args, **kwargs):
-	oc = ObjectContainer()
-	parts = [PartObject(key=Callback(episode_url, sid=sid, eid=eid, ehash=ehash, part=0))]
-	if Prefs["mark_watched"] == 'да':
-		parts.append(PartObject(key=Callback(episode_url, sid=sid, eid=eid, ehash=ehash, part=1)))
-	oc.add(EpisodeObject(
-		key=Callback(play_episode, sid = sid, eid = eid, ehash = ehash, row=row),
-		rating_key='soap4me' + row["eid"],
-		items=[MediaObject(
-			video_resolution = 720 if row['quality'].encode('utf-8')=='720p' else 400,
-			video_codec = VideoCodec.H264,
-			audio_codec = AudioCodec.AAC,
-			container = Container.MP4,
-			optimized_for_streaming = True,
-			audio_channels = 2,
-			parts = parts
-		)]
-	))
-	return oc
+    for item in soaps:
 
-def episode_url(sid, eid, ehash, part):
-	token = Dict['token']
-	if part == 1:
-		params = {"what": "mark_watched", "eid": eid, "token": token}
-		data = JSON.ObjectFromURL("http://soap4.me/callback/", params, headers = {'x-api-token': Dict['token'], 'Cookie': 'PHPSESSID='+Dict['sid']})
-		return Redirect('https://soap4.me/assets/blank/blank1.mp4')
+        container.add(plex.make_tvshow_item(show_seasons, item))
+    return container
 
-	myhash = hashlib.md5(str(token)+str(eid)+str(sid)+str(ehash)).hexdigest()
-	params = {"what": "player", "do": "load", "token":token, "eid":eid, "hash":myhash}
 
-	data = JSON.ObjectFromURL("http://soap4.me/callback/", params, headers = {'x-api-token': Dict['token'], 'Cookie': 'PHPSESSID='+Dict['sid']})
-	#Log.Debug('!!!!!!!!!!!!!!!!!! === ' + str(data))
-	if data["ok"] == 1:
-		return Redirect("http://%s.soap4.me/%s/%s/%s/" % (data['server'], token, eid, myhash))
+@route(PREFIX + '/soaps/{soap_id}')
+def show_seasons(soap_id, soap_title):
+    'show tvshow seasons'
+    seasons = {}
+    season_episodes = {}
 
-def GET(url):
-	return JSON.ObjectFromURL(url, headers = {'x-api-token': Dict['token'], 'Cookie': 'PHPSESSID='+Dict['sid']}, cacheTime = 0)
+    episodes = soap.get_episodes(soap_id)
+
+    for episode in episodes:
+        season_num = int(episode['season'])
+        episode_num = int(episode['episode'])
+
+        if season_num not in seasons:
+            seasons[season_num] = episode['season_id']
+
+        if season_num not in season_episodes:
+            season_episodes[season_num] = []
+
+        if episode_num not in season_episodes[season_num]:
+            season_episodes[season_num].append(episode_num)
+
+    container = ObjectContainer(title2=soap_title)
+
+    for season in seasons:
+        season_id = seasons[season]
+        container.add(
+            plex.make_season_item(
+                show_episodes,
+                soap_id, soap_title,
+                season, season_id,
+                season_episodes,
+            )
+        )
+
+    return container
+
+
+@route(PREFIX + '/soaps/{soap_id}/{season_num}')
+def show_episodes(soap_id, season_num, soap_title):
+    'show season episodes'
+
+    container = ObjectContainer(title2=u'%s - %s сезон ' % (soap_title, season_num))
+
+    episodes = soap.get_season_episodes(soap_id, season_num)
+    episodes = locutils.filter_episodes_by_quality(episodes)
+
+    for episode in episodes:
+        container.add(plex.make_episode_item(play_episode, episode_url, episode))
+
+    return container
+
+
+@route(PREFIX + '/soaps/{soap_id}/{season_num}/{episode_num}')
+def play_episode(soap_id, season_num, episode_num):
+    'starts episode playing or marks episode as watched'
+
+    episode_obj = soap.get_episode(soap_id, season_num, episode_num)
+    if episode_obj is None:
+        Log.Critical("episode {} not found".format(episode_num))
+        return MessageContainer(
+            "Ошибка",
+            "Эпизод не найден"
+        )
+
+    container = ObjectContainer(title2=locutils.make_title(episode_obj))
+    container.add(plex.make_episode_item(play_episode, episode_url, episode_obj))
+
+    return container
+
+
+@route(PREFIX + '/soaps/{soap_id}/{season_num}/{episode_num}/play/{part}')
+def episode_url(soap_id, season_num, episode_num, part):
+    'provides specific url for episode'
+
+    episode = soap.get_episode(soap_id, season_num, episode_num)
+    if episode is None:
+        Log.Critical("episode s{}e{} not found".format(season_num, episode_num))
+        return MessageContainer(
+            "Ошибка",
+            "Эпизод не найден"
+        )
+    Log.Debug("[episode_url] episode: {}".format(json.dumps(episode, indent=2)))
+
+    eid = episode['eid']
+    ehash = episode['hash']
+    token = Dict['token']
+
+    if part == 1:
+        return soap.mark_watched(eid)
+
+    myhash = hashlib.md5(
+        str(token) + str(eid) + str(soap_id) + str(ehash)
+    ).hexdigest()
+    params = {
+        "what": "player",
+        "do": "load",
+        "token": token,
+        "eid": eid,
+        "hash": myhash
+    }
+
+    data = JSON.ObjectFromURL(
+        "http://soap4.me/callback/",
+        params,
+        headers={
+            'x-api-token': token,
+            'Cookie': 'PHPSESSID=' + Dict['sid']
+        })
+
+    Log.Debug("player data: {}".format(json.dumps(data, indent=2)))
+
+    if data["ok"] == 1:
+        return Redirect("http://%s.soap4.me/%s/%s/%s/" % (data['server'], token, eid, myhash))

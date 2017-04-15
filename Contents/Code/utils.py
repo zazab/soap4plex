@@ -71,7 +71,6 @@ def filter_episodes_by_quality(episodes):
 
     if quality == "HD":
         for episode in episodes:
-            Log.Debug('episode: {}'.format(json.dumps(episode, indent=2)))
             if episode['quality'] == '720p':
                 only_hd = True
                 break

@@ -53,6 +53,32 @@ def GetSoapsLetters():
         letter = item['title'][0]
         if letter not in letters:
             letters.append(letter)
-    
+
     return letters
 
+
+def mark_watched(eid):
+    token = Dict['token']
+    params = {
+        "what": "mark_watched",
+        "eid": eid,
+        "token": token,
+    }
+
+    data = JSON.ObjectFromURL(
+        "http://soap4.me/callback/",
+        params,
+        headers={
+            'x-api-token': token,
+            'Cookie': 'PHPSESSID=' + Dict['sid']
+        }
+    )
+
+    if data["ok"] != 1:
+        return MessageContainer(
+            "Ошибка",
+            "Ведите пароль и логин"
+        )
+
+    Log.Debug("episode {} marked watched".format(episode_num))
+    return Redirect('https://soap4.me/assets/blank/blank1.mp4')

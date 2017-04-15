@@ -241,11 +241,11 @@ def show_seasons(soap_id, soap_title):
     return container
 
 
-@route(PREFIX + '/soaps/{sid}/{season}', allow_sync=True)
-def show_episodes(soap_id, season, soap_title):
-    container = ObjectContainer(title2=u'%s - %s сезон ' % (soap_title, season))
+@route(PREFIX + '/soaps/{soap_id}/{season_num}')
+def show_episodes(soap_id, season_num, soap_title):
+    container = ObjectContainer(title2=u'%s - %s сезон ' % (soap_title, season_num))
 
-    episodes = soap.get_season_episodes(soap_id, season)
+    episodes = soap.get_season_episodes(soap_id, season_num)
     episodes = utils.filter_episodes_by_quality(episodes)
 
     for episode in episodes:
@@ -263,24 +263,17 @@ def play_episode(soap_id, season_num, episode_num, *args, **kwargs):
     return container
 
 
-@route(PREFIX + '/soaps/{soap_id}/{season_num}/{episode_num}/play')
-def episode_url(soap_id, eid, ehash, part, *args, **kwargs):
-    Log.Debug("[episode url] soap_id: {}; eid: {}; ehash: {}; part: {}".format(
-        soap_id, eid, ehash, part,
-    ))
+@route(PREFIX + '/soaps/{soap_id}/{season_num}/{episode_num}/play/{part}')
+def episode_url(soap_id, season_num, episode_num, part, *args, **kwargs):
+    episode = soap.get_episode(soap_id, season_num, episode_num)
+    Log.Debug("[episode_url] episode: {}".format(json.dumps(episode, indent=2)))
+
+    eid = episode['eid']
+    ehash = episode['hash']
     token = Dict['token']
+
     if part == 1:
-        params = {"what": "mark_watched", "eid": eid, "token": token}
-        data = JSON.ObjectFromURL(
-            "http://soap4.me/callback/",
-            params,
-            headers={
-                'x-api-token': Dict['token'],
-                'Cookie': 'PHPSESSID=' + Dict['sid']
-            }
-        )
-        Log.Debug("marked: {}".format(json.dumps(data, indent=2)))
-        return Redirect('https://soap4.me/assets/blank/blank1.mp4')
+        return soap.mark_watched(eid)
 
     myhash = hashlib.md5(
         str(token) + str(eid) + str(soap_id) + str(ehash)
@@ -297,10 +290,12 @@ def episode_url(soap_id, eid, ehash, part, *args, **kwargs):
         "http://soap4.me/callback/",
         params,
         headers={
-            'x-api-token': Dict['token'],
+            'x-api-token': token,
             'Cookie': 'PHPSESSID=' + Dict['sid']
         })
-    #Log.Debug('!!!!!!!!!!!!!!!!!! === ' + str(data))
+
+    Log.Debug("player data: {}".format(json.dumps(data, indent=2)))
+
     if data["ok"] == 1:
         return Redirect("http://%s.soap4.me/%s/%s/%s/" % (data['server'], token, eid, myhash))
 

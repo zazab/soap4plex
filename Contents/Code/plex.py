@@ -36,49 +36,37 @@ def make_tvshow_item(callback, tvshow):
     )
 
 
-def make_season_item(callback, soapID, soapTitle, season, seasonID, episodes):
-    title = "%s сезон" % (season)
+def make_season_item(callback, soap_id, soap_title, season_num, season_id, episodes):
+    title = "%s сезон" % (season_num)
     if Dict['filters']['new']:
-        title = "%s сезон (%s)" % (season, len(episodes[season]))
+        title = "%s сезон (%s)" % (season_num, len(episodes[season_num]))
 
-    seasonStr = str(season)
-    poster = "http://covers.s4me.ru/season/big/%s.jpg" % seasonID
+    seasonStr = str(season_num)
+    poster = "http://covers.s4me.ru/season/big/%s.jpg" % season_id
     thumb = Function(utils.Thumb, url=poster)
 
     return SeasonObject(
         key=Callback(
             callback,
-            soap_id=soapID,
-            season=seasonStr,
-            soap_title=soapTitle,
+            soap_id=soap_id,
+            season_num=seasonStr,
+            soap_title=soap_title,
         ),
-        episode_count=len(episodes[season]),
-        show=soapTitle,
-        rating_key=str(season),
+        episode_count=len(episodes[season_num]),
+        show=soap_title,
+        rating_key=str(season_num),
         title=title,
         thumb=thumb
     )
 
-
-def make_episode_item(play_callback, url_callback, episode):
-    eid = episode["eid"]
-    ehash = episode['hash']
-    soap_id = episode['sid']
-
-    title = utils.make_title(episode)
-    summary = episode['spoiler']
-    poster = "http://covers.s4me.ru/season/big/%s.jpg" % episode['season_id']
-    thumb = Function(utils.Thumb, url=poster)
-
+def make_episode_parts(url_callback, soap_id, season_num, episode_num):
     parts = [
         PartObject(
             key=Callback(
                 url_callback,
                 soap_id=soap_id,
-                season_num=episode['season'],
-                episode_num=episode['episode'],
-                eid=eid,
-                ehash=ehash,
+                season_num=season_num,
+                episode_num=episode_num,
                 part=0
             )
         )
@@ -90,14 +78,22 @@ def make_episode_item(play_callback, url_callback, episode):
                 key=Callback(
                     url_callback,
                     soap_id=soap_id,
-                    season_num=episode['season'],
-                    episode_num=episode['episode'],
-                    eid=eid,
-                    ehash=ehash,
+                    season_num=season_num,
+                    episode_num=episode_num,
                     part=1
                 )
             )
         )
+
+    return parts
+
+
+def make_episode_item(play_callback, url_callback, episode):
+    eid = episode["eid"]
+    Log.Debug("EPISODE ID: {}".format(eid))
+    soap_id = episode['sid']
+    season_num = episode['season']
+    episode_num = episode['episode']
 
     resolution = 400
     if episode['quality'].encode('utf-8') == '720p':
@@ -107,14 +103,13 @@ def make_episode_item(play_callback, url_callback, episode):
         key=Callback(
             play_callback,
             soap_id=soap_id,
-            season_num=episode['season'],
-            episode_num=episode['episode']
+            season_num=season_num,
+            episode_num=episode_num,
         ),
         rating_key='soap4me' + eid,
-        title=title,
+        title=utils.make_title(episode),
         index=int(episode['episode']),
-        thumb=thumb,
-        summary=summary,
+        summary=episode['spoiler'],
         items=[
             MediaObject(
                 video_resolution=resolution,
@@ -123,7 +118,7 @@ def make_episode_item(play_callback, url_callback, episode):
                 container=Container.MP4,
                 optimized_for_streaming=True,
                 audio_channels=1,
-                parts=parts
+                parts=make_episode_parts(url_callback, soap_id, season_num, episode_num)
             )
         ]
     )

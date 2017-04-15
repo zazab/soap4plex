@@ -60,10 +60,11 @@ def make_season_item(callback, soapID, soapTitle, season, seasonID, episodes):
     )
 
 
-def make_episode_item(play, url, episode):
+def make_episode_item(play_callback, url_callback, episode):
     eid = episode["eid"]
     ehash = episode['hash']
-    sid = episode['sid']
+    soap_id = episode['sid']
+
     title = utils.make_title(episode)
     summary = episode['spoiler']
     poster = "http://covers.s4me.ru/season/big/%s.jpg" % episode['season_id']
@@ -72,8 +73,10 @@ def make_episode_item(play, url, episode):
     parts = [
         PartObject(
             key=Callback(
-                url,
-                sid=sid,
+                url_callback,
+                soap_id=soap_id,
+                season_num=episode['season'],
+                episode_num=episode['episode'],
                 eid=eid,
                 ehash=ehash,
                 part=0
@@ -85,8 +88,10 @@ def make_episode_item(play, url, episode):
         parts.append(
             PartObject(
                 key=Callback(
-                    url,
-                    sid=sid,
+                    url_callback,
+                    soap_id=soap_id,
+                    season_num=episode['season'],
+                    episode_num=episode['episode'],
                     eid=eid,
                     ehash=ehash,
                     part=1
@@ -100,8 +105,10 @@ def make_episode_item(play, url, episode):
 
     return EpisodeObject(
         key=Callback(
-            play,
-            episode=episode
+            play_callback,
+            soap_id=soap_id,
+            season_num=episode['season'],
+            episode_num=episode['episode']
         ),
         rating_key='soap4me' + eid,
         title=title,

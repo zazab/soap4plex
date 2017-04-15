@@ -254,19 +254,19 @@ def show_episodes(soap_id, season, soap_title):
     return container
 
 
-def play_episode(episode, *args, **kwargs):
-    Log.Debug('args: {}'.format(json.dumps(args, indent=2)))
-    Log.Debug('kwargs: {}'.format(json.dumps(kwargs, indent=2)))
-    container = ObjectContainer(title2=utils.make_title(episode))
-
-    container.add(plex.make_episode_item(play_episode, episode_url, episode))
+@route(PREFIX + '/soaps/{soap_id}/{season_num}/{episode_num}')
+def play_episode(soap_id, season_num, episode_num, *args, **kwargs):
+    episode_obj = soap.get_episode(soap_id, season_num, episode_num)
+    container = ObjectContainer(title2=utils.make_title(episode_obj))
+    container.add(plex.make_episode_item(play_episode, episode_url, episode_obj))
 
     return container
 
 
-def episode_url(sid, eid, ehash, part, *args, **kwargs):
-    Log.Debug("[episode url] sid: {}; eid: {}; ehash: {}; part: {}".format(
-        sid, eid, ehash, part,
+@route(PREFIX + '/soaps/{soap_id}/{season_num}/{episode_num}/play')
+def episode_url(soap_id, eid, ehash, part, *args, **kwargs):
+    Log.Debug("[episode url] soap_id: {}; eid: {}; ehash: {}; part: {}".format(
+        soap_id, eid, ehash, part,
     ))
     token = Dict['token']
     if part == 1:
@@ -283,7 +283,7 @@ def episode_url(sid, eid, ehash, part, *args, **kwargs):
         return Redirect('https://soap4.me/assets/blank/blank1.mp4')
 
     myhash = hashlib.md5(
-        str(token) + str(eid) + str(sid) + str(ehash)
+        str(token) + str(eid) + str(soap_id) + str(ehash)
     ).hexdigest()
     params = {
         "what": "player",

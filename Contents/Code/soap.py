@@ -24,6 +24,18 @@ def get_episodes(soap_id):
     return utils.filter_unwatched_episodes(episodes)
 
 
+def get_episode(soap_id, season_num, episode_num):
+    url = API_URL + 'episodes/' + soap_id
+    episodes = utils.GET(url)
+    episodes = utils.filter_episodes_by_quality(episodes)
+
+    for episode in episodes:
+        if episode['season'] == season_num and episode['episode'] == episode_num:
+            return episode
+
+    return None
+
+
 def get_season_episodes(soap_id, season):
     episodes = get_episodes(soap_id)
 

@@ -39,8 +39,7 @@ def make_title(episode):
 
 
 def filter_unwatched_soaps(soaps):
-    watched = Dict['filters']['new']
-    if watched:
+    if Dict['filters']['new']:
         soaps = [x for x in soaps if x['unwatched'] is not None]
         Log.Debug('{} filtered soaps'.format(len(soaps)))
 
@@ -48,11 +47,10 @@ def filter_unwatched_soaps(soaps):
 
 
 def filter_unwatched_episodes(episodes):
-    watched = Dict['filters']['new']
-    if watched:
-        soaps = [x for x in episodes if x['watched'] is None]
+    if Dict['filters']['new']:
+        episodes = [x for x in episodes if x['watched'] is None]
 
-    return soaps
+    return episodes
 
 
 def filter_by_letter(soaps):

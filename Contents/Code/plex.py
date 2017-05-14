@@ -1,7 +1,25 @@
 # -*- coding: utf-8 -*-
 "plex module"
 
+import hashlib
 import locutils
+
+ICON = 'icon.png'
+
+def Thumb(url):
+    """
+    if url specified, returns it wrapped in Data objec.
+    if no url provided, returns default icon
+    """
+
+    if url == '':
+        return Redirect(R(ICON))
+    else:
+        try:
+            data = HTTP.Request(url, cacheTime=CACHE_1WEEK).content
+            return DataObject(data, 'image/jpeg')
+        except:
+            return Redirect(R(ICON))
 
 def make_menu_item(callback, title, filters):
     "generates simple menu entry"
@@ -25,9 +43,7 @@ def make_tvshow_item(callback, tvshow):
     fan = 'http://thetvdb.com/banners/fanart/original/' + \
         tvshow['tvdb_id'] + '-1.jpg'
     soap_id = tvshow["sid"]
-    thumb = Function(locutils.thumb, url=poster)
-
-    Log.Debug('made item for {}'.format(title))
+    thumb = Function(Thumb, url=poster)
 
     return TVShowObject(
         key=Callback(
@@ -51,7 +67,7 @@ def make_season_item(callback, soap_id, soap_title, season_num, season_id, episo
 
     season_str = str(season_num)
     poster = "http://covers.s4me.ru/season/big/%s.jpg" % season_id
-    thumb = Function(locutils.thumb, url=poster)
+    thumb = Function(Thumb, url=poster)
 
     return SeasonObject(
         key=Callback(
@@ -67,18 +83,40 @@ def make_season_item(callback, soap_id, soap_title, season_num, season_id, episo
         thumb=thumb
     )
 
-def make_episode_parts(url_callback, soap_id, season_num, episode_num):
+
+def make_episode_url(token, eid, soap_id, ehash):
+    myhash = hashlib.md5(
+        str(token) + str(eid) + str(soap_id) + str(ehash)
+    ).hexdigest()
+    params = {
+        "what": "player",
+        "do": "load",
+        "token": token,
+        "eid": eid,
+        "hash": myhash
+    }
+
+    data = JSON.ObjectFromURL(
+        "http://soap4.me/callback/",
+        params,
+        headers={
+            'x-api-token': token,
+            'Cookie': 'PHPSESSID=' + Dict['sid']
+        })
+
+    if data["ok"] == 1:
+        url = "http://%s.soap4.me/%s/%s/%s/" % (data['server'], token, eid, myhash)
+        return url
+
+    return MessageContainer("can't get url")
+
+def make_episode_parts(url_callback, soap_id, eid, ehash):
     "generates episode parts"
 
+    url=make_episode_url(Dict['token'], eid, soap_id, ehash)
     parts = [
         PartObject(
-            key=Callback(
-                url_callback,
-                soap_id=soap_id,
-                season_num=season_num,
-                episode_num=episode_num,
-                part=0
-            )
+            key=url
         )
     ]
 
@@ -87,11 +125,10 @@ def make_episode_parts(url_callback, soap_id, season_num, episode_num):
             PartObject(
                 key=Callback(
                     url_callback,
-                    soap_id=soap_id,
-                    season_num=season_num,
-                    episode_num=episode_num,
-                    part=1
-                )
+                    eid=eid,
+                    url=url,
+                    ),
+                duration=1,
             )
         )
 
@@ -102,10 +139,10 @@ def make_episode_item(play_callback, url_callback, episode):
     "generates episode object"
 
     eid = episode["eid"]
-    Log.Debug("EPISODE ID: {}".format(eid))
     soap_id = episode['sid']
     season_num = episode['season']
     episode_num = episode['episode']
+    ehash = episode['hash']
 
     resolution = 400
     if episode['quality'].encode('utf-8') == '720p':
@@ -130,7 +167,7 @@ def make_episode_item(play_callback, url_callback, episode):
                 container=Container.MP4,
                 optimized_for_streaming=True,
                 audio_channels=1,
-                parts=make_episode_parts(url_callback, soap_id, season_num, episode_num)
+                parts=make_episode_parts(url_callback, soap_id, eid, ehash)
             )
         ]
     )

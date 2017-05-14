@@ -8,7 +8,6 @@ soap4.me plex plugin
 # updated by sergio v.1.2.2 2014-08-28
 
 import re
-import hashlib
 import urllib
 import calendar
 import time
@@ -23,12 +22,30 @@ PREFIX = "/video/soap4meNew"
 TITLE = 'soap4.me (new)'
 ART = 'art.png'
 USER_AGENT = 'xbmc for soap'
+ICON = 'icon.png'
+
+def Thumb(url):
+    """
+    if url specified, returns it wrapped in Data objec.
+    if no url provided, returns default icon
+    """
+
+    if url == '':
+        return Redirect(R(ICON))
+    else:
+        try:
+            data = HTTP.Request(url, cacheTime=CACHE_1WEEK).content
+            return DataObject(data, 'image/jpeg')
+        except:
+            return Redirect(R(ICON))
 
 
 def Start():
+    'plex plugin init function'
+
     ObjectContainer.art = R(ART)
     ObjectContainer.title1 = TITLE
-    DirectoryObject.thumb = R(locutils.ICON)
+    DirectoryObject.thumb = R(ICON)
 
     HTTP.CacheTime = CACHE_1HOUR
     HTTP.Headers['User-Agent'] = USER_AGENT
@@ -37,13 +54,13 @@ def Start():
     HTTP.Headers['Accept-Language'] = 'ru-ru,ru;q=0.8,en-us;q=0.5,en;q=0.3'
 
 
-@handler(PREFIX, TITLE, thumb=locutils.ICON, art=ART)
+@handler(PREFIX, TITLE, thumb=ICON, art=ART)
 def main_menu():
     "makes main menu"
 
     container = ObjectContainer()
     container.add(plex.make_menu_item(
-        soaps,
+        show_soaps,
         title=u'Все сериалы',
         filters={
             'my': False,
@@ -51,7 +68,7 @@ def main_menu():
         }
     ))
     container.add(plex.make_menu_item(
-        soaps,
+        show_soaps,
         title=u'Я смотрю',
         filters={
             "my": True,
@@ -59,7 +76,7 @@ def main_menu():
         }
     ))
     container.add(plex.make_menu_item(
-        soaps,
+        show_soaps,
         title=u'Новые эпизоды',
         filters={
             "my": True,
@@ -73,17 +90,9 @@ def main_menu():
 
 @route(PREFIX + '/filters')
 def set_filters(title2):
-    '''
-    letters = soap.get_soaps_letters()
+    'shows filter lists'
 
-    container = ObjectContainer(title2=u'Filters')
-    container.add(
-        plex.makePopupDirectory(
-            starts_with_filter,
-            title=u'Starts with',
-        )
-    )
-    '''
+    # TODO: add some more filters?
 
     return starts_with_filter(title2)
 
@@ -115,20 +124,16 @@ def set_letter_filter(letter, title2):
 
     filters = Dict['filters']
     filters['letter'] = letter
-
-    Log.Debug('setting filters: {}'.format(json.dumps(filters, indent=2)))
     Dict['filters'] = filters
-    Log.Debug('filters set')
 
-    return soaps(title2)
+    return show_soaps(title2)
 
 
 @route(PREFIX + '/soaps', filters={})
-def soaps(title2, filters=None):
+def show_soaps(title2, filters=None):
     'show soaps'
 
     if filters != None:
-        Log.Debug("setting filters: {}".format(json.dumps(filters, indent=2)))
         Dict['filters'] = filters
 
     error = soap.login()
@@ -154,6 +159,7 @@ def soaps(title2, filters=None):
 
 @route(PREFIX + '/soaps/{soap_id}')
 def show_seasons(soap_id, soap_title):
+    'show tvshow seasons'
     seasons = {}
     season_episodes = {}
 
@@ -190,19 +196,24 @@ def show_seasons(soap_id, soap_title):
 
 @route(PREFIX + '/soaps/{soap_id}/{season_num}')
 def show_episodes(soap_id, season_num, soap_title):
+    'show season episodes'
+
     container = ObjectContainer(title2=u'%s - %s сезон ' % (soap_title, season_num))
 
     episodes = soap.get_season_episodes(soap_id, season_num)
     episodes = locutils.filter_episodes_by_quality(episodes)
 
     for episode in episodes:
-        container.add(plex.make_episode_item(play_episode, episode_url, episode))
+        container.add(plex.make_episode_item(
+            play_episode, mark_episode_watched, episode))
 
     return container
 
 
 @route(PREFIX + '/soaps/{soap_id}/{season_num}/{episode_num}')
-def play_episode(soap_id, season_num, episode_num):
+def play_episode(soap_id, season_num, episode_num, *args, **kwargs):
+    'starts episode playing or marks episode as watched'
+
     episode_obj = soap.get_episode(soap_id, season_num, episode_num)
     if episode_obj is None:
         Log.Critical("episode {} not found".format(episode_num))
@@ -212,51 +223,14 @@ def play_episode(soap_id, season_num, episode_num):
         )
 
     container = ObjectContainer(title2=locutils.make_title(episode_obj))
-    container.add(plex.make_episode_item(play_episode, episode_url, episode_obj))
+    container.add(plex.make_episode_item(
+        play_episode, mark_episode_watched, episode_obj))
 
     return container
 
 
-@route(PREFIX + '/soaps/{soap_id}/{season_num}/{episode_num}/play/{part}')
-def episode_url(soap_id, season_num, episode_num, part):
-    'provides specific url for episode'
+@route(PREFIX + '/watched')
+def mark_episode_watched(eid, url, *args, **kwargs):
+    'makrs episode watched'
 
-    episode = soap.get_episode(soap_id, season_num, episode_num)
-    if episode is None:
-        Log.Critical("episode s{}e{} not found".format(season_num, episode_num))
-        return MessageContainer(
-            "Ошибка",
-            "Эпизод не найден"
-        )
-    Log.Debug("[episode_url] episode: {}".format(json.dumps(episode, indent=2)))
-
-    eid = episode['eid']
-    ehash = episode['hash']
-    token = Dict['token']
-
-    if part == 1:
-        return soap.mark_watched(eid)
-
-    myhash = hashlib.md5(
-        str(token) + str(eid) + str(soap_id) + str(ehash)
-    ).hexdigest()
-    params = {
-        "what": "player",
-        "do": "load",
-        "token": token,
-        "eid": eid,
-        "hash": myhash
-    }
-
-    data = JSON.ObjectFromURL(
-        "http://soap4.me/callback/",
-        params,
-        headers={
-            'x-api-token': token,
-            'Cookie': 'PHPSESSID=' + Dict['sid']
-        })
-
-    Log.Debug("player data: {}".format(json.dumps(data, indent=2)))
-
-    if data["ok"] == 1:
-        return Redirect("http://%s.soap4.me/%s/%s/%s/" % (data['server'], token, eid, myhash))
+    return soap.mark_watched(eid, url)

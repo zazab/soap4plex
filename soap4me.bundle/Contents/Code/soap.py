@@ -3,10 +3,12 @@
 module soap provides methods for accessing soap shows
 """
 
+import json
 import locutils
 
 API_URL = 'http://soap4.me/api/'
 LOGIN_URL = 'http://soap4.me/login/'
+
 
 
 def login():
@@ -14,7 +16,7 @@ def login():
     password = Prefs['password']
 
     if not username or not password:
-        Log.Debug("No user or password in settings")
+        Log.Critical("No user or password in settings")
         return MessageContainer(
             "Ошибка",
             "Ведите пароль и логин"
@@ -34,7 +36,7 @@ def login():
                 cacheTime=1
             )
         except Exception as ex:
-            Log.Debug("can't log in: {}".format(ex))
+            Log.Critical("can't log in: {}".format(ex))
             obj = []
             return 3
 
@@ -62,14 +64,15 @@ def get_soaps():
     soaps = locutils.get(url)
     soaps = sorted(soaps, key=lambda k: k['title'])
 
-    Log.Debug("got {} soaps".format(len(soaps)))
-
     return locutils.filter_unwatched_soaps(soaps)
 
 
-def get_episodes(soap_id):
+def get_episodes(soap_id, all=False):
     url = API_URL + 'episodes/' + soap_id
     episodes = locutils.get(url)
+
+    if all:
+        return episodes
 
     return locutils.filter_unwatched_episodes(episodes)
 
@@ -108,8 +111,10 @@ def get_soaps_letters():
     return letters
 
 
-def mark_watched(eid):
+def mark_watched(eid, url):
     "marks episode eid watched"
+
+    Log.Debug('[mark_watched] Start')
 
     token = Dict['token']
     params = {
@@ -127,11 +132,11 @@ def mark_watched(eid):
         }
     )
 
-    if data["ok"] != 1:
-        return MessageContainer(
-            "Ошибка",
-            "Ведите пароль и логин"
-        )
+    Log.Debug('[mark_watched] got response: %s' % json.dumps(data, indent=2))
 
-    Log.Debug("episode {} marked watched".format(eid))
-    return Redirect('https://soap4.me/assets/blank/blank1.mp4')
+    if data["ok"] != 1:
+        return MessageContainer("Can't mark watched")
+
+    Log.Debug("[mark watched] episode {} marked watched".format(eid))
+    return Redirect('http://soap4.me/assets/blank/blank1.mp4')
+

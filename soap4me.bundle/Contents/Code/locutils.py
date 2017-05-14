@@ -1,24 +1,6 @@
 # -*- coding: utf-8 -*-
 "some util methods"
 
-ICON = 'icon.png'
-
-def thumb(url):
-    """
-    if url specified, returns it wrapped in Data objec.
-    if no url provided, returns default icon
-    """
-    if url == '':
-        return Redirect(R(ICON))
-    else:
-        try:
-            data = HTTP.Request(url, cacheTime=CACHE_1WEEK).content
-            return DataObject(data, 'image/jpeg')
-        except Exception as ex:
-            Log.Error(ex)
-            return Redirect(R(ICON))
-
-
 def get(url):
     """
     performs GET request to soap url, setting corresponding headers

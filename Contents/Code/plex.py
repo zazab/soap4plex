@@ -127,7 +127,7 @@ def make_episode_parts(url_callback, soap_id, eid, ehash):
                     url_callback,
                     eid=eid,
                     url=url,
-                    ),
+                ),
                 duration=1,
             )
         )

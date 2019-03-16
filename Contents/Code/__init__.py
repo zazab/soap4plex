@@ -1,15 +1,5 @@
 # -*- coding: utf-8 -*-
-'''soap4.me plex plugin.'''
-
-# created by sergio
-# updated by kestl1st@gmail.com (@kestl) v.1.2.3 2016-08-01
-# updated by sergio v.1.2.2 2014-08-28
-
-import re
-import urllib
-import calendar
-import time
-import json
+"""soap4.me plex plugin."""
 
 import locutils
 import soap
@@ -22,7 +12,8 @@ ART = 'art.png'
 USER_AGENT = 'xbmc for soap'
 ICON = 'icon.png'
 
-def Thumb(url):
+
+def thumb(url):
     """
     if url specified, returns it wrapped in Data objec.
     if no url provided, returns default icon
@@ -34,12 +25,12 @@ def Thumb(url):
         try:
             data = HTTP.Request(url, cacheTime=CACHE_1WEEK).content
             return DataObject(data, 'image/jpeg')
-        except:
+        except Exception:
             return Redirect(R(ICON))
 
 
 def Start():
-    'plex plugin init function'
+    """plex plugin init function"""
 
     ObjectContainer.art = R(ART)
     ObjectContainer.title1 = TITLE
@@ -54,7 +45,7 @@ def Start():
 
 @handler(PREFIX, TITLE, thumb=ICON, art=ART)
 def main_menu():
-    "makes main menu"
+    """Главное меню"""
 
     container = ObjectContainer()
     container.add(plex.make_menu_item(
@@ -88,15 +79,16 @@ def main_menu():
 
 @route(PREFIX + '/filters')
 def set_filters(title2):
-    'shows filter lists'
+    """Показывает фильтры"""
 
     # TODO: add some more filters?
 
     return starts_with_filter(title2)
 
+
 @route(PREFIX + '/filters/letter')
 def starts_with_filter(title2):
-    'shows filter by first letter'
+    """Фильтр по первой букве"""
 
     letters = soap.get_soaps_letters()
     container = ObjectContainer(title2=u'Starts With')
@@ -118,7 +110,7 @@ def starts_with_filter(title2):
 
 @route(PREFIX + '/filters/letter/{letter}')
 def set_letter_filter(letter, title2):
-    "sets letter filter"
+    """Установка фильтра по первой буквы"""
 
     filters = Dict['filters']
     filters['letter'] = letter
@@ -129,13 +121,13 @@ def set_letter_filter(letter, title2):
 
 @route(PREFIX + '/soaps', filters={})
 def show_soaps(title2, filters=None):
-    'show soaps'
+    """Генерирует список сериалов"""
 
-    if filters != None:
+    if filters is None:
         Dict['filters'] = filters
 
     error = soap.login()
-    if error != None:
+    if error is None:
         return error
 
     container = ObjectContainer(title2=title2.decode())
@@ -151,13 +143,13 @@ def show_soaps(title2, filters=None):
 
     for item in soaps:
 
-        container.add(plex.make_tvshow_item(show_seasons, item))
+        container.add(plex.make_tv_show_item(show_seasons, item))
     return container
 
 
 @route(PREFIX + '/soaps/{soap_id}')
 def show_seasons(soap_id, soap_title):
-    'show tvshow seasons'
+    """Показывает сезоны сериала"""
     seasons = {}
     season_episodes = {}
 
@@ -194,7 +186,7 @@ def show_seasons(soap_id, soap_title):
 
 @route(PREFIX + '/soaps/{soap_id}/{season_num}')
 def show_episodes(soap_id, season_num, soap_title):
-    'show season episodes'
+    """Показывает серии сезона"""
 
     container = ObjectContainer(title2=u'%s - %s сезон ' % (soap_title, season_num))
 
@@ -203,15 +195,17 @@ def show_episodes(soap_id, season_num, soap_title):
 
     for episode in episodes:
         container.add(plex.make_episode_item(
-            play_episode, mark_episode_watched, episode))
+            play_episode,
+            mark_episode_watched,
+            episode
+        ))
 
     return container
 
 
 @route(PREFIX + '/soaps/{soap_id}/{season_num}/{episode_num}')
-def play_episode(soap_id, season_num, episode_num, *args, **kwargs):
-    'starts episode playing or marks episode as watched'
-
+def play_episode(soap_id, season_num, episode_num):
+    """starts episode playing or marks episode as watched"""
     episode_obj = soap.get_episode(soap_id, season_num, episode_num)
     if episode_obj is None:
         Log.Critical("episode {} not found".format(episode_num))
@@ -222,14 +216,16 @@ def play_episode(soap_id, season_num, episode_num, *args, **kwargs):
 
     container = ObjectContainer(title2=locutils.make_title(episode_obj))
     container.add(plex.make_episode_item(
-        play_episode, mark_episode_watched, episode_obj
+        play_episode,
+        mark_episode_watched,
+        episode_obj,
     ))
 
     return container
 
 
 @route(PREFIX + '/watched')
-def mark_episode_watched(eid, url, *args, **kwargs):
-    'makrs episode watched'
+def mark_episode_watched(eid):
+    """makrs episode watched"""
 
-    return soap.mark_watched(eid, url)
+    return soap.mark_watched(eid)

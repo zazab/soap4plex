@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-"some util methods"
+"""some util methods"""
+
 
 def get(url):
     """
@@ -16,7 +17,7 @@ def get(url):
 
 
 def make_title(episode):
-    'generates episode title'
+    """generates episode title"""
 
     new = ''
     if not episode['watched']:
@@ -34,7 +35,7 @@ def make_title(episode):
 
 
 def filter_unwatched_soaps(soaps):
-    'filters watched shows if filter new is set'
+    """filters watched shows if filter new is set"""
 
     if Dict['filters']['new']:
         soaps = [x for x in soaps if x['unwatched'] is not None]
@@ -44,7 +45,7 @@ def filter_unwatched_soaps(soaps):
 
 
 def filter_unwatched_episodes(episodes):
-    'filters watched episodes if filter new is set'
+    """filters watched episodes if filter new is set"""
 
     if Dict['filters']['new']:
         episodes = [x for x in episodes if x['watched'] is None]
@@ -53,7 +54,7 @@ def filter_unwatched_episodes(episodes):
 
 
 def filter_by_letter(soaps):
-    'filters shows by first letter if filter letter is set'
+    """filters shows by first letter if filter letter is set"""
 
     try:
         letter = Dict['filters']['letter']
@@ -64,7 +65,7 @@ def filter_by_letter(soaps):
 
 
 def filter_episodes_by_quality(episodes):
-    'filters episodes by quality'
+    """filters episodes by quality"""
 
     quality = Prefs["quality"]
     only_hd = False
@@ -82,6 +83,6 @@ def filter_episodes_by_quality(episodes):
 
 
 def filter_episodes_by_season(episodes, season_num):
-    'filter episodes by season'
+    """filter episodes by season"""
 
     return [x for x in episodes if x['season'] == season_num]

@@ -10,7 +10,6 @@ API_URL = 'http://soap4.me/api/'
 LOGIN_URL = 'http://soap4.me/login/'
 
 
-
 def login():
     username = Prefs['username']
     password = Prefs['password']
@@ -21,37 +20,35 @@ def login():
             "Ошибка",
             "Ведите пароль и логин"
         )
+
+    try:
+        values = {
+            'login':    username,
+            'password': password,
+        }
+
+        obj = JSON.ObjectFromURL(
+            LOGIN_URL,
+            values,
+            encoding='utf-8',
+            cacheTime=1
+        )
+    except Exception as ex:
+        Log.Critical("can't log in: {}".format(ex))
+        return 3
+
+    if len(obj['token']) > 0:
+        Dict['sid'] = obj['sid']
+        Dict['token'] = obj['token']
+
+        return None
     else:
+        Dict['sessionid'] = ""
 
-        try:
-            values = {
-                'login':    username,
-                'password': password,
-            }
-
-            obj = JSON.ObjectFromURL(
-                LOGIN_URL,
-                values,
-                encoding='utf-8',
-                cacheTime=1
-            )
-        except Exception as ex:
-            Log.Critical("can't log in: {}".format(ex))
-            obj = []
-            return 3
-
-        if len(obj['token']) > 0:
-            Dict['sid'] = obj['sid']
-            Dict['token'] = obj['token']
-
-            return None
-        else:
-            Dict['sessionid'] = ""
-
-            return MessageContainer(
-                "Ошибка",
-                "Отказано в доступе"
-            )
+        return MessageContainer(
+            "Ошибка",
+            "Отказано в доступе"
+        )
 
 
 def get_soaps():
@@ -67,18 +64,18 @@ def get_soaps():
     return locutils.filter_unwatched_soaps(soaps)
 
 
-def get_episodes(soap_id, all=False):
+def get_episodes(soap_id, full=False):
     url = API_URL + 'episodes/' + soap_id
     episodes = locutils.get(url)
 
-    if all:
+    if full:
         return episodes
 
     return locutils.filter_unwatched_episodes(episodes)
 
 
 def get_episode(soap_id, season_num, episode_num):
-    'returns episode by soap_id, season, and episode num'
+    """returns episode by soap_id, season, and episode num"""
     episodes = get_episodes(soap_id)
     episodes = locutils.filter_episodes_by_season(episodes, season_num)
     episodes = locutils.filter_episodes_by_quality(episodes)
@@ -111,8 +108,8 @@ def get_soaps_letters():
     return letters
 
 
-def mark_watched(eid, url):
-    "marks episode eid watched"
+def mark_watched(eid):
+    """marks episode eid watched"""
 
     Log.Debug('[mark_watched] Start')
 

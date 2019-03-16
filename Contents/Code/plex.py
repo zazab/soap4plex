@@ -166,7 +166,7 @@ def make_episode_item(play_callback, url_callback, episode):
                 audio_codec=AudioCodec.AAC,
                 container=Container.MP4,
                 optimized_for_streaming=True,
-                audio_channels=1,
+                audio_channels=2,
                 parts=make_episode_parts(url_callback, soap_id, eid, ehash)
             )
         ]

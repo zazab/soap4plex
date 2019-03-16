@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-'''
-soap4.me plex plugin
-'''
+'''soap4.me plex plugin.'''
 
 # created by sergio
 # updated by kestl1st@gmail.com (@kestl) v.1.2.3 2016-08-01
@@ -224,7 +222,8 @@ def play_episode(soap_id, season_num, episode_num, *args, **kwargs):
 
     container = ObjectContainer(title2=locutils.make_title(episode_obj))
     container.add(plex.make_episode_item(
-        play_episode, mark_episode_watched, episode_obj))
+        play_episode, mark_episode_watched, episode_obj
+    ))
 
     return container
 

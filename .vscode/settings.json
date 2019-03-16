@@ -1,3 +1,4 @@
 {
-    "python.sortImports.args": []
+    "python.sortImports.args": [],
+    "python.linting.pylintEnabled": true
 }

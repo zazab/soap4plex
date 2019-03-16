@@ -113,7 +113,7 @@ def make_episode_url(token, eid, soap_id, ehash):
 def make_episode_parts(url_callback, soap_id, eid, ehash):
     "generates episode parts"
 
-    url=make_episode_url(Dict['token'], eid, soap_id, ehash)
+    url = make_episode_url(Dict['token'], eid, soap_id, ehash)
     parts = [
         PartObject(
             key=url
@@ -170,4 +170,4 @@ def make_episode_item(play_callback, url_callback, episode):
                 parts=make_episode_parts(url_callback, soap_id, eid, ehash)
             )
         ]
-    )
+   )

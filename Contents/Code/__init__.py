@@ -123,11 +123,12 @@ def set_letter_filter(letter, title2):
 def show_soaps(title2, filters=None):
     """Генерирует список сериалов"""
 
-    if filters is None:
+    if filters is not None:
         Dict['filters'] = filters
 
     error = soap.login()
-    if error is None:
+    if error is not None:
+        Log.Critical("got auth error")
         return error
 
     container = ObjectContainer(title2=title2.decode())
@@ -142,7 +143,6 @@ def show_soaps(title2, filters=None):
     soaps = locutils.filter_by_letter(soaps)
 
     for item in soaps:
-
         container.add(plex.make_tv_show_item(show_seasons, item))
     return container
 
@@ -204,7 +204,7 @@ def show_episodes(soap_id, season_num, soap_title):
 
 
 @route(PREFIX + '/soaps/{soap_id}/{season_num}/{episode_num}')
-def play_episode(soap_id, season_num, episode_num):
+def play_episode(soap_id, season_num, episode_num, *args, **kwargs):
     """starts episode playing or marks episode as watched"""
     episode_obj = soap.get_episode(soap_id, season_num, episode_num)
     if episode_obj is None:
@@ -225,7 +225,7 @@ def play_episode(soap_id, season_num, episode_num):
 
 
 @route(PREFIX + '/watched')
-def mark_episode_watched(eid):
+def mark_episode_watched(eid, *args, **kwargs):
     """makrs episode watched"""
 
     return soap.mark_watched(eid)

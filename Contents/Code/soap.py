@@ -136,4 +136,3 @@ def mark_watched(eid):
 
     Log.Debug("[mark watched] episode {} marked watched".format(eid))
     return Redirect('http://soap4.me/assets/blank/blank1.mp4')
-

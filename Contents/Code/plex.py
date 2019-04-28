@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """plex module"""
 
-import hashlib
 import locutils
 
 ICON = 'icon.png'
@@ -84,40 +83,13 @@ def make_season_item(callback, soap_id, soap_title, season_num, season_id, episo
     )
 
 
-def play_episode(token, eid, soap_id, ehash):
-    hashed = hashlib.md5(
-        str(token) + str(eid) + str(soap_id) + str(ehash)
-    ).hexdigest()
-    params = {
-        "what": "player",
-        "do": "load",
-        "token": token,
-        "eid": eid,
-        "hash": hashed
-    }
-
-    data = JSON.ObjectFromURL(
-        "http://soap4.me/callback/",
-        params,
-        headers={
-            'x-api-token': token,
-            'Cookie': 'PHPSESSID=' + Dict['sid']
-        })
-
-    if data["ok"] == 1:
-        url = "http://%s.soap4.me/%s/%s/%s/" % (data['server'], token, eid, hashed)
-        return Redirect(url)
-
-    return MessageContainer("can't get url")
-
-
-def make_episode_parts(mark_watched_callback, soap_id, eid, ehash):
+def make_episode_parts(url_callback, watched_callback, soap_id, eid, ehash):
     """generates episode parts"""
 
     parts = [
         PartObject(
             key=Callback(
-                play_episode,
+                url_callback,
                 token=Dict['token'],
                 eid=eid,
                 soap_id=soap_id,
@@ -130,7 +102,7 @@ def make_episode_parts(mark_watched_callback, soap_id, eid, ehash):
         parts.append(
             PartObject(
                 key=Callback(
-                    mark_watched_callback,
+                    watched_callback,
                     eid=eid,
                 ),
                 duration=1,
@@ -140,7 +112,7 @@ def make_episode_parts(mark_watched_callback, soap_id, eid, ehash):
     return parts
 
 
-def make_episode_item(play_callback, mark_watched_callback, episode):
+def make_episode_item(play_callback, url_callback, watched_callback, episode):
     """generates episode object"""
 
     eid = episode["eid"]
@@ -172,7 +144,7 @@ def make_episode_item(play_callback, mark_watched_callback, episode):
                 container=Container.MP4,
                 optimized_for_streaming=True,
                 audio_channels=1,
-                parts=make_episode_parts(mark_watched_callback, soap_id, eid, episode_hash)
+                parts=make_episode_parts(url_callback, watched_callback, soap_id, eid, episode_hash)
             )
         ]
     )

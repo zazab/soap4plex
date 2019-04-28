@@ -4,6 +4,7 @@
 import locutils
 import soap
 import plex
+import hashlib
 
 VERSION = 2.0
 PREFIX = "/video/soap4meNew"
@@ -196,6 +197,7 @@ def show_episodes(soap_id, season_num, soap_title):
     for episode in episodes:
         container.add(plex.make_episode_item(
             play_episode,
+            play_episode_url,
             mark_episode_watched,
             episode
         ))
@@ -217,6 +219,7 @@ def play_episode(soap_id, season_num, episode_num, *args, **kwargs):
     container = ObjectContainer(title2=locutils.make_title(episode_obj))
     container.add(plex.make_episode_item(
         play_episode,
+        play_episode_url,
         mark_episode_watched,
         episode_obj,
     ))
@@ -229,3 +232,31 @@ def mark_episode_watched(eid, *args, **kwargs):
     """makrs episode watched"""
 
     return soap.mark_watched(eid)
+
+def play_episode_url(token, eid, soap_id, ehash):
+    hashed = hashlib.md5(
+        str(token) + str(eid) + str(soap_id) + str(ehash)
+    ).hexdigest()
+    params = {
+        "what": "player",
+        "do": "load",
+        "token": token,
+        "eid": eid,
+        "hash": hashed
+    }
+
+    data = JSON.ObjectFromURL(
+        "http://soap4.me/callback/",
+        params,
+        headers={
+            'x-api-token': token,
+            'Cookie': 'PHPSESSID=' + Dict['sid']
+        })
+
+    if data["ok"] == 1:
+        url = "http://%s.soap4.me/%s/%s/%s/" % (data['server'], token, eid, hashed)
+        return Redirect(url)
+
+    return MessageContainer("can't get url")
+
+

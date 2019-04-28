@@ -31,20 +31,20 @@ def make_menu_item(callback, title, filters):
     )
 
 
-def make_tv_show_item(callback, tvShow):
+def make_tv_show_item(callback, tv_show):
     """generates tv show object"""
-    soap_title = tvShow["title"]
+    soap_title = tv_show["title"]
     title = soap_title
     if Dict['filters']['new']:
-        title += " (" + str(tvShow["unwatched"]) + ")"
+        title += " (" + str(tv_show["unwatched"]) + ")"
 
-    summary = tvShow["description"]
-    poster = 'http://covers.s4me.ru/soap/big/' + tvShow["sid"] + '.jpg'
-    rating = float(tvShow["imdb_rating"])
+    summary = tv_show["description"]
+    poster = 'http://covers.s4me.ru/soap/big/' + tv_show["sid"] + '.jpg'
+    rating = float(tv_show["imdb_rating"])
     summary = summary.replace('&quot;', '"')
     fan = 'http://thetvdb.com/banners/fanart/original/' + \
-          tvShow['tvdb_id'] + '-1.jpg'
-    soap_id = tvShow["sid"]
+          tv_show['tvdb_id'] + '-1.jpg'
+    soap_id = tv_show["sid"]
 
     return TVShowObject(
         key=Callback(
@@ -84,7 +84,7 @@ def make_season_item(callback, soap_id, soap_title, season_num, season_id, episo
     )
 
 
-def make_episode_url(token, eid, soap_id, ehash):
+def play_episode(token, eid, soap_id, ehash):
     hashed = hashlib.md5(
         str(token) + str(eid) + str(soap_id) + str(ehash)
     ).hexdigest()
@@ -106,7 +106,7 @@ def make_episode_url(token, eid, soap_id, ehash):
 
     if data["ok"] == 1:
         url = "http://%s.soap4.me/%s/%s/%s/" % (data['server'], token, eid, hashed)
-        return url
+        return Redirect(url)
 
     return MessageContainer("can't get url")
 
@@ -114,10 +114,15 @@ def make_episode_url(token, eid, soap_id, ehash):
 def make_episode_parts(mark_watched_callback, soap_id, eid, ehash):
     """generates episode parts"""
 
-    url = make_episode_url(Dict['token'], eid, soap_id, ehash)
     parts = [
         PartObject(
-            key=url
+            key=Callback(
+                play_episode,
+                token=Dict['token'],
+                eid=eid,
+                soap_id=soap_id,
+                ehash=ehash
+            )
         )
     ]
 
@@ -127,7 +132,6 @@ def make_episode_parts(mark_watched_callback, soap_id, eid, ehash):
                 key=Callback(
                     mark_watched_callback,
                     eid=eid,
-                    url=url,
                 ),
                 duration=1,
             )
